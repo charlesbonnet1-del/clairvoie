@@ -160,6 +160,12 @@ model Ticket {
   // par l'escalade automatique et les statistiques publiques.
   receptionConfirmeeAt DateTime?
 
+  // Date et horaire des faits rapportés par le parent (distincts du dépôt
+  // du signalement, createdAt). Optionnels, non structurants pour le délai
+  // officiel — uniquement informatifs pour l'instruction du dossier.
+  dateFaits    DateTime?
+  horaireFaits String? // moment approximatif, ex. "14h30", "pendant la récréation du matin"
+
   reponseContenu  String?
   reponduAt       DateTime?
   escaladeAt      DateTime?
@@ -176,33 +182,34 @@ model Ticket {
   auditLogs         AuditLog[]
   suitesJudiciaires SuiteJudiciaire[]
   tentativesContact TentativeContact[]
-  personneMiseEnCause PersonneMiseEnCause?
+  personnesMiseEnCause PersonneMiseEnCause[]
 }
 
 // ---------------------------------------------------------------------------
-// Identification de la personne mise en cause — strictement scopée au
-// ticket (article 46 Loi Informatique et Libertés : un particulier ne peut
-// traiter une donnée relative à une infraction que pour préparer ou suivre
-// sa propre action de victime, jamais pour constituer un fichier
+// Identification de la ou des personnes mises en cause — strictement scopée
+// au ticket (article 46 Loi Informatique et Libertés : un particulier ne
+// peut traiter une donnée relative à une infraction que pour préparer ou
+// suivre sa propre action de victime, jamais pour constituer un fichier
 // consultable au-delà de son propre dossier).
 //
-// ticketId est @unique : un seul enregistrement par ticket, jamais partagé.
-// Volontairement AUCUN index sur nom/fonction/contexte : n'ajoute jamais un
+// Plusieurs entrées sont possibles pour un même ticket (plusieurs personnes
+// mises en cause dans un même signalement), mais chaque entrée reste liée à
+// UN SEUL ticket via ticketId — jamais partagée ni réutilisée entre
+// tickets. Volontairement AUCUN index sur nom/fonction : n'ajoute jamais un
 // tel index, il rendrait possible/performante une requête du type "tous les
 // tickets mentionnant telle personne", ce que ce modèle doit précisément
 // empêcher. Le seul point d'accès autorisé à cette table est
-// lib/personneMiseEnCause.ts -> recupererPersonneMiseEnCause, qui ne fait
-// jamais de findMany/groupBy dessus — voir les tests dédiés.
+// lib/personneMiseEnCause.ts -> recupererPersonnesMiseEnCause, qui ne fait
+// de findMany que filtré sur un ticketId précis, jamais sur le contenu —
+// voir les tests dédiés.
 // ---------------------------------------------------------------------------
 model PersonneMiseEnCause {
-  id           String    @id @default(cuid())
-  ticketId     String    @unique
-  ticket       Ticket    @relation(fields: [ticketId], references: [id])
-  nom          String?
-  fonction     String? // ex. "enseignant", "animateur périscolaire", "autre élève"
-  dateFaits    DateTime? // date des faits, si connue
-  horaireFaits String? // moment approximatif, ex. "14h30", "pendant la récréation du matin"
-  recurrent    Boolean   @default(false) // les faits se seraient déjà produits
+  id        String  @id @default(cuid())
+  ticketId  String
+  ticket    Ticket  @relation(fields: [ticketId], references: [id])
+  nom       String?
+  fonction  String? // ex. "enseignant", "animateur périscolaire", "autre élève"
+  recurrent Boolean @default(false) // les faits se seraient déjà produits avec cette personne
 }
 
 // ---------------------------------------------------------------------------

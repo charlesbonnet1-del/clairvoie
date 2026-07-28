@@ -10,6 +10,8 @@ export async function creerSignalement(params: {
   categorie: string;
   contenu: string;
   gravite: string;
+  dateFaits?: Date | null;
+  horaireFaits?: string | null;
 }) {
   const ticket = await prisma.ticket.create({
     data: {
@@ -19,6 +21,8 @@ export async function creerSignalement(params: {
       contenu: params.contenu,
       gravite: params.gravite,
       statut: "ouvert",
+      dateFaits: params.dateFaits ?? null,
+      horaireFaits: params.horaireFaits ?? null,
     },
   });
   await appendAuditLog({

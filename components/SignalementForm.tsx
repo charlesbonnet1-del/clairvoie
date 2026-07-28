@@ -28,10 +28,21 @@ interface ContactSecondaire {
   porteur: string;
 }
 
+interface PersonneMiseEnCauseSaisie {
+  id: string;
+  nom: string;
+  fonction: string;
+  recurrent: boolean;
+}
+
 let prochainId = 0;
 function nouveauContactSecondaire(): ContactSecondaire {
   prochainId += 1;
   return { id: `contact-${prochainId}`, type: "email", valeur: "", porteur: "" };
+}
+function nouvellePersonneMiseEnCause(): PersonneMiseEnCauseSaisie {
+  prochainId += 1;
+  return { id: `personne-${prochainId}`, nom: "", fonction: "", recurrent: false };
 }
 
 export default function SignalementForm() {
@@ -49,6 +60,9 @@ export default function SignalementForm() {
   const [loadingContactsOfficiels, setLoadingContactsOfficiels] = useState(false);
 
   const [contactsSecondaires, setContactsSecondaires] = useState<ContactSecondaire[]>([]);
+  const [personnesMiseEnCause, setPersonnesMiseEnCause] = useState<PersonneMiseEnCauseSaisie[]>(
+    []
+  );
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -138,6 +152,22 @@ export default function SignalementForm() {
     );
   }
 
+  function ajouterPersonneMiseEnCause() {
+    setPersonnesMiseEnCause((liste) => [...liste, nouvellePersonneMiseEnCause()]);
+  }
+  function retirerPersonneMiseEnCause(id: string) {
+    setPersonnesMiseEnCause((liste) => liste.filter((p) => p.id !== id));
+  }
+  function modifierPersonneMiseEnCause(
+    id: string,
+    champ: keyof PersonneMiseEnCauseSaisie,
+    valeur: string | boolean
+  ) {
+    setPersonnesMiseEnCause((liste) =>
+      liste.map((p) => (p.id === id ? { ...p, [champ]: valeur } : p))
+    );
+  }
+
   const etablissementSelectionne =
     etablissementChoice && etablissementChoice !== AUTRE_ETABLISSEMENT
       ? etablissements.find((e) => e.uai === etablissementChoice) ?? null
@@ -152,6 +182,12 @@ export default function SignalementForm() {
     contactsSecondaires
       .filter((c) => c.valeur.trim())
       .map((c) => ({ type: c.type, valeur: c.valeur.trim(), porteur: c.porteur.trim() }))
+  );
+
+  const personnesMiseEnCauseJson = JSON.stringify(
+    personnesMiseEnCause
+      .filter((p) => p.nom.trim() || p.fonction.trim() || p.recurrent)
+      .map((p) => ({ nom: p.nom.trim(), fonction: p.fonction.trim(), recurrent: p.recurrent }))
   );
 
   return (
@@ -180,7 +216,9 @@ export default function SignalementForm() {
         value={etablissementChoice === AUTRE_ETABLISSEMENT ? "" : etablissementSelectionne?.adresse ?? ""}
       />
       <input type="hidden" name="contactsSecondairesJson" value={contactsSecondairesJson} />
+      <input type="hidden" name="personnesMiseEnCauseJson" value={personnesMiseEnCauseJson} />
 
+      {/* 1. Commune */}
       <div className="relative">
         <label className="label" htmlFor="commune">
           Commune
@@ -217,6 +255,7 @@ export default function SignalementForm() {
         )}
       </div>
 
+      {/* 2. Établissement (+ coordonnées officielles + contacts secondaires) */}
       {selectedCommune && (
         <div>
           <label className="label" htmlFor="etablissementChoice">
@@ -366,6 +405,87 @@ export default function SignalementForm() {
         </div>
       )}
 
+      {/* 3. Date des faits */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="label" htmlFor="dateFaits">
+            Date des faits
+          </label>
+          <input className="input" type="date" id="dateFaits" name="dateFaits" />
+        </div>
+        <div>
+          <label className="label" htmlFor="horaireFaits">
+            Horaire des faits
+          </label>
+          <input
+            className="input"
+            id="horaireFaits"
+            name="horaireFaits"
+            placeholder="ex. 14h30, pendant la récréation…"
+          />
+        </div>
+      </div>
+
+      {/* 4. Personne(s) mise(s) en cause */}
+      <div className="rounded-lg border border-dashed border-slate-300 p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-slate-600">
+            Personne(s) mise(s) en cause (optionnel)
+          </p>
+          <button
+            type="button"
+            className="text-xs text-clairvoie-bleuclair underline"
+            onClick={ajouterPersonneMiseEnCause}
+          >
+            + Ajouter une personne
+          </button>
+        </div>
+        <p className="text-xs text-slate-400">
+          Aide l&apos;établissement à instruire votre signalement — à ne remplir que si vous le
+          souhaitez, un signalement reste déposable sans cette information.
+        </p>
+        {personnesMiseEnCause.map((personne) => (
+          <div key={personne.id} className="space-y-2 rounded-lg bg-slate-50 p-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-500">Personne</p>
+              <button
+                type="button"
+                className="text-xs text-slate-400 underline"
+                onClick={() => retirerPersonneMiseEnCause(personne.id)}
+              >
+                Retirer
+              </button>
+            </div>
+            <input
+              className="input"
+              placeholder="Nom (si connu)"
+              value={personne.nom}
+              onChange={(e) => modifierPersonneMiseEnCause(personne.id, "nom", e.target.value)}
+            />
+            <input
+              className="input"
+              placeholder="Fonction (ex. enseignant, animateur périscolaire, autre élève…)"
+              value={personne.fonction}
+              onChange={(e) =>
+                modifierPersonneMiseEnCause(personne.id, "fonction", e.target.value)
+              }
+            />
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={personne.recurrent}
+                onChange={(e) =>
+                  modifierPersonneMiseEnCause(personne.id, "recurrent", e.target.checked)
+                }
+              />
+              Ces faits se seraient déjà produits avec cette personne (récurrent)
+            </label>
+          </div>
+        ))}
+      </div>
+
+      {/* 5. Catégorie */}
       <div>
         <label className="label" htmlFor="categorie">
           Catégorie
@@ -380,6 +500,7 @@ export default function SignalementForm() {
         </select>
       </div>
 
+      {/* 6. Description */}
       <div>
         <label className="label" htmlFor="contenu">
           Description des faits
@@ -392,45 +513,6 @@ export default function SignalementForm() {
           required
           placeholder="Décrivez les faits observés, avec autant de précision que possible…"
         />
-      </div>
-
-      <div className="rounded-lg border border-dashed border-slate-300 p-3 space-y-2">
-        <p className="text-xs font-medium text-slate-600">
-          Personne mise en cause (optionnel)
-        </p>
-        <p className="text-xs text-slate-400">
-          Aide l&apos;établissement à instruire votre signalement — à ne remplir que si
-          vous le souhaitez, un signalement reste déposable sans cette information.
-        </p>
-        <input className="input" name="personneNom" placeholder="Nom (si connu)" />
-        <input
-          className="input"
-          name="personneFonction"
-          placeholder="Fonction (ex. enseignant, animateur périscolaire, autre élève…)"
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="label text-xs" htmlFor="personneDateFaits">
-              Date des faits
-            </label>
-            <input className="input" type="date" id="personneDateFaits" name="personneDateFaits" />
-          </div>
-          <div>
-            <label className="label text-xs" htmlFor="personneHoraireFaits">
-              Horaire des faits
-            </label>
-            <input
-              className="input"
-              id="personneHoraireFaits"
-              name="personneHoraireFaits"
-              placeholder="ex. 14h30, pendant la récréation…"
-            />
-          </div>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" name="personneRecurrent" value="oui" className="h-4 w-4" />
-          Ces faits se seraient déjà produits (récurrent)
-        </label>
       </div>
 
       <button type="submit" className="btn btn-primary w-full" disabled={!formValide}>

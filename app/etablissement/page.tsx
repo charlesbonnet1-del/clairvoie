@@ -3,8 +3,9 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { RESPONSE_DEADLINE_HOURS } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
-import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
+import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
 import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
+import DateFaitsLigne from "@/components/DateFaitsLigne";
 
 function delaiRestant(receptionConfirmeeAt: Date): string {
   const deadline = new Date(
@@ -43,8 +44,8 @@ export default async function EtablissementPage({
   const personnesMiseEnCause = new Map(
     await Promise.all(
       tickets.map(async (ticket) => {
-        const personne = await recupererPersonneMiseEnCause({ ticketId: ticket.id, identity });
-        return [ticket.id, personne] as const;
+        const personnes = await recupererPersonnesMiseEnCause({ ticketId: ticket.id, identity });
+        return [ticket.id, personnes] as const;
       })
     )
   );
@@ -80,10 +81,9 @@ export default async function EtablissementPage({
               </span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
+            <DateFaitsLigne ticket={ticket} />
 
-            {personnesMiseEnCause.get(ticket.id) && (
-              <PersonneMiseEnCauseCard personne={personnesMiseEnCause.get(ticket.id)!} />
-            )}
+            <PersonneMiseEnCauseCard personnes={personnesMiseEnCause.get(ticket.id) ?? []} />
 
             {ticket.statut === "ouvert" && ticket.receptionConfirmeeAt && (
               <>

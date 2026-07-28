@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { creerSignalement } from "@/lib/tickets";
 import {
-  recupererPersonneMiseEnCause,
+  recupererPersonnesMiseEnCause,
   enregistrerPersonneMiseEnCause,
 } from "@/lib/personneMiseEnCause";
 import { GET as getDashboardStats } from "@/app/api/dashboard/stats/route";
@@ -39,15 +39,22 @@ describe("Accès restreint à PersonneMiseEnCause", () => {
       categorie: "Test",
       contenu: "Signalement ouvert, non escaladé",
       gravite: "legere",
+      dateFaits: new Date("2026-03-12"),
+      horaireFaits: "Sortie scolaire, après-midi",
     });
     ticketOuvertId = ticketOuvert.id;
+    // Deux personnes mises en cause pour ce même ticket.
     await enregistrerPersonneMiseEnCause({
       ticketId: ticketOuvertId,
       nom: "Jean Dupont",
       fonction: "animateur périscolaire",
-      dateFaits: "2026-03-12",
-      horaireFaits: "Sortie scolaire, après-midi",
       recurrent: true,
+    });
+    await enregistrerPersonneMiseEnCause({
+      ticketId: ticketOuvertId,
+      nom: "Paul Petit",
+      fonction: "animateur périscolaire",
+      recurrent: false,
     });
 
     const ticketEscalade = await creerSignalement({
@@ -81,51 +88,51 @@ describe("Accès restreint à PersonneMiseEnCause", () => {
     await prisma.commune.deleteMany();
   });
 
-  it("l'établissement instructeur du ticket peut le lire", async () => {
-    const resultat = await recupererPersonneMiseEnCause({
+  it("l'établissement instructeur du ticket peut lire toutes les personnes mises en cause du ticket", async () => {
+    const resultat = await recupererPersonnesMiseEnCause({
       ticketId: ticketOuvertId,
       identity: { role: "ETABLISSEMENT", etablissementId: etablissementIdA },
     });
-    expect(resultat?.nom).toBe("Jean Dupont");
+    expect(resultat.map((p) => p.nom).sort()).toEqual(["Jean Dupont", "Paul Petit"]);
   });
 
-  it("un autre établissement (non instructeur de ce ticket) ne peut pas le lire", async () => {
-    const resultat = await recupererPersonneMiseEnCause({
+  it("un autre établissement (non instructeur de ce ticket) ne peut rien lire", async () => {
+    const resultat = await recupererPersonnesMiseEnCause({
       ticketId: ticketOuvertId,
       identity: { role: "ETABLISSEMENT", etablissementId: etablissementIdB },
     });
-    expect(resultat).toBeNull();
+    expect(resultat).toEqual([]);
   });
 
-  it("l'association tierce peut le lire", async () => {
-    const resultat = await recupererPersonneMiseEnCause({
+  it("l'association tierce peut lire", async () => {
+    const resultat = await recupererPersonnesMiseEnCause({
       ticketId: ticketOuvertId,
       identity: { role: "ASSOCIATION_TIERCE", etablissementId: null },
     });
-    expect(resultat?.nom).toBe("Jean Dupont");
+    expect(resultat).toHaveLength(2);
   });
 
-  it("le rectorat ne peut PAS lire ce champ pour un ticket non escaladé", async () => {
-    const resultat = await recupererPersonneMiseEnCause({
+  it("le rectorat ne peut RIEN lire pour un ticket non escaladé", async () => {
+    const resultat = await recupererPersonnesMiseEnCause({
       ticketId: ticketOuvertId,
       identity: { role: "RECTORAT", etablissementId: null },
     });
-    expect(resultat).toBeNull();
+    expect(resultat).toEqual([]);
   });
 
-  it("le rectorat PEUT lire ce champ pour un ticket explicitement escaladé, et uniquement celui-ci", async () => {
-    const resultatEscalade = await recupererPersonneMiseEnCause({
+  it("le rectorat PEUT lire pour un ticket explicitement escaladé, et uniquement celui-ci", async () => {
+    const resultatEscalade = await recupererPersonnesMiseEnCause({
       ticketId: ticketEscaladeId,
       identity: { role: "RECTORAT", etablissementId: null },
     });
-    expect(resultatEscalade?.nom).toBe("Marie Martin");
+    expect(resultatEscalade.map((p) => p.nom)).toEqual(["Marie Martin"]);
 
     // Toujours refusé pour le ticket non escaladé, même pour le même compte.
-    const resultatOuvert = await recupererPersonneMiseEnCause({
+    const resultatOuvert = await recupererPersonnesMiseEnCause({
       ticketId: ticketOuvertId,
       identity: { role: "RECTORAT", etablissementId: null },
     });
-    expect(resultatOuvert).toBeNull();
+    expect(resultatOuvert).toEqual([]);
   });
 
   it("le dashboard public n'expose jamais ce champ, même avec des paramètres non documentés", async () => {
@@ -133,6 +140,7 @@ describe("Accès restreint à PersonneMiseEnCause", () => {
     const raw = await response.text();
 
     expect(raw).not.toContain("Jean Dupont");
+    expect(raw).not.toContain("Paul Petit");
     expect(raw).not.toContain("Marie Martin");
     expect(raw).not.toContain("animateur périscolaire");
     expect(raw).not.toContain("PersonneMiseEnCause");

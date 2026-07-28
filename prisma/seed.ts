@@ -267,6 +267,8 @@ async function main() {
       statut: "trianguléfondé",
       createdAt: daysAgo(25),
       receptionConfirmeeAt: receptionRapide(daysAgo(25)),
+      dateFaits: daysAgo(25),
+      horaireFaits: "Pause méridienne, cour de récréation",
       reponduAt: daysAgo(24),
       reponseContenu: "Le personnel concerné a été suspendu dans l'attente des conclusions.",
       verdict: "fondé",
@@ -282,7 +284,6 @@ async function main() {
     ticketId: t6.id,
     nom: "Surveillant non identifié nommément par le parent",
     fonction: "surveillant",
-    horaireFaits: "Pause méridienne, cour de récréation",
     recurrent: true,
   });
 
@@ -368,16 +369,23 @@ async function main() {
       statut: "escaladé",
       createdAt: daysAgo(20),
       receptionConfirmeeAt: receptionRapide(daysAgo(20)),
+      dateFaits: daysAgo(21),
+      horaireFaits: "Sur le trajet de la cantine",
       escaladeAt: daysAgo(15),
     },
   });
   await log(t11.id, "creation", p2);
   await log(t11.id, "escalade_silence", "system:cron");
+  // Deux personnes mises en cause pour ce même signalement.
   await enregistrerPersonneMiseEnCause({
     ticketId: t11.id,
     fonction: "autre élève",
-    horaireFaits: "Sur le trajet de la cantine",
     recurrent: true,
+  });
+  await enregistrerPersonneMiseEnCause({
+    ticketId: t11.id,
+    fonction: "autre élève",
+    recurrent: false,
   });
 
   // T12 — clôturé par accord mutuel, fenêtre dépassée, avec suite judiciaire "sans_nouvelle"

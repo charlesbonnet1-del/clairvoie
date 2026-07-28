@@ -3,8 +3,9 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { VERDICTS, TYPES_CONTACT } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
-import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
+import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
 import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
+import DateFaitsLigne from "@/components/DateFaitsLigne";
 
 const LABEL_TYPE_CONTACT: Record<string, string> = {
   email: "Email",
@@ -38,8 +39,8 @@ export default async function AssociationPage({
   const personnesMiseEnCause = new Map(
     await Promise.all(
       aTrianguler.map(async (ticket) => {
-        const personne = await recupererPersonneMiseEnCause({ ticketId: ticket.id, identity });
-        return [ticket.id, personne] as const;
+        const personnes = await recupererPersonnesMiseEnCause({ ticketId: ticket.id, identity });
+        return [ticket.id, personnes] as const;
       })
     )
   );
@@ -162,15 +163,14 @@ export default async function AssociationPage({
               </span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
+            <DateFaitsLigne ticket={ticket} />
             {ticket.reponseContenu && (
               <div className="rounded-lg bg-slate-50 p-3 text-sm">
                 <p className="font-medium text-slate-700">Réponse de l&apos;établissement</p>
                 <p className="text-slate-600">{ticket.reponseContenu}</p>
               </div>
             )}
-            {personnesMiseEnCause.get(ticket.id) && (
-              <PersonneMiseEnCauseCard personne={personnesMiseEnCause.get(ticket.id)!} />
-            )}
+            <PersonneMiseEnCauseCard personnes={personnesMiseEnCause.get(ticket.id) ?? []} />
             <form
               action={`/api/signalement/${ticket.id}/trianguler`}
               method="post"

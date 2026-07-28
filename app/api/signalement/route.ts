@@ -23,11 +23,9 @@ export async function POST(req: NextRequest) {
     const categorie = String(formData.get("categorie") ?? "");
     const contenu = String(formData.get("contenu") ?? "");
     const contactsSecondairesJson = String(formData.get("contactsSecondairesJson") ?? "[]");
-    const personneNom = String(formData.get("personneNom") ?? "");
-    const personneFonction = String(formData.get("personneFonction") ?? "");
-    const personneDateFaits = String(formData.get("personneDateFaits") ?? "");
-    const personneHoraireFaits = String(formData.get("personneHoraireFaits") ?? "");
-    const personneRecurrent = formData.get("personneRecurrent") === "oui";
+    const personnesMiseEnCauseJson = String(formData.get("personnesMiseEnCauseJson") ?? "[]");
+    const dateFaitsBrut = String(formData.get("dateFaits") ?? "");
+    const horaireFaits = String(formData.get("horaireFaits") ?? "");
 
     if (!communeNom || !etablissementNom || !categorie || !contenu.trim()) {
       return NextResponse.redirect(
@@ -79,16 +77,26 @@ export async function POST(req: NextRequest) {
       categorie,
       contenu,
       gravite: deriverGraviteDepuisCategorie(categorie),
+      dateFaits: dateFaitsBrut.trim() ? new Date(dateFaitsBrut.trim()) : null,
+      horaireFaits: horaireFaits.trim() || null,
     });
 
-    await enregistrerPersonneMiseEnCause({
-      ticketId: ticket.id,
-      nom: personneNom,
-      fonction: personneFonction,
-      dateFaits: personneDateFaits,
-      horaireFaits: personneHoraireFaits,
-      recurrent: personneRecurrent,
-    });
+    let personnesMiseEnCause: Array<{ nom?: string; fonction?: string; recurrent?: boolean }> = [];
+    try {
+      const parsed = JSON.parse(personnesMiseEnCauseJson);
+      if (Array.isArray(parsed)) personnesMiseEnCause = parsed;
+    } catch {
+      personnesMiseEnCause = [];
+    }
+
+    for (const personne of personnesMiseEnCause) {
+      await enregistrerPersonneMiseEnCause({
+        ticketId: ticket.id,
+        nom: personne.nom,
+        fonction: personne.fonction,
+        recurrent: Boolean(personne.recurrent),
+      });
+    }
 
     // Tente automatiquement de délivrer le signalement à l'établissement par
     // les canaux disponibles. N'échoue jamais silencieusement mais ne

@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
+import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
 import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
+import DateFaitsLigne from "@/components/DateFaitsLigne";
 
 export default async function RectoratPage() {
   const identity = await getSession();
@@ -21,8 +22,8 @@ export default async function RectoratPage() {
   const personnesMiseEnCause = new Map(
     await Promise.all(
       tickets.map(async (ticket) => {
-        const personne = await recupererPersonneMiseEnCause({ ticketId: ticket.id, identity });
-        return [ticket.id, personne] as const;
+        const personnes = await recupererPersonnesMiseEnCause({ ticketId: ticket.id, identity });
+        return [ticket.id, personnes] as const;
       })
     )
   );
@@ -53,9 +54,8 @@ export default async function RectoratPage() {
               <span className="badge badge-escaladé">Escaladé</span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
-            {personnesMiseEnCause.get(ticket.id) && (
-              <PersonneMiseEnCauseCard personne={personnesMiseEnCause.get(ticket.id)!} />
-            )}
+            <DateFaitsLigne ticket={ticket} />
+            <PersonneMiseEnCauseCard personnes={personnesMiseEnCause.get(ticket.id) ?? []} />
             <p className="text-xs text-slate-400">
               Escaladé le {ticket.escaladeAt?.toLocaleString("fr-FR") ?? "—"}
             </p>

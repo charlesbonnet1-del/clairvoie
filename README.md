@@ -185,24 +185,31 @@ Vérifié par `tests/test_delai_demarre_a_reception_confirmee.test.ts`,
 
 ## Identification de la personne mise en cause — strictement scopée au ticket
 
-Le formulaire de dépôt propose, en option, d'identifier la personne mise en
-cause (nom, fonction, date et horaire des faits, caractère récurrent ou
-non) — jamais obligatoire, un signalement reste déposable sans cette
-information.
+Le formulaire de dépôt (dans cet ordre : commune, établissement, date des
+faits, personne(s) mise(s) en cause, catégorie, description) propose, en
+option, d'identifier une ou plusieurs personnes mises en cause (nom,
+fonction, caractère récurrent ou non — bouton « + Ajouter une personne »,
+répétable) — jamais obligatoire, un signalement reste déposable sans cette
+information. La date et l'horaire des faits sont, eux, portés directement
+par le signalement (`Ticket.dateFaits` / `horaireFaits`), pas par la
+personne.
 
 Cadre légal strict (article 46 loi Informatique et Libertés) : un
 particulier ne peut traiter une donnée relative à une infraction que pour
 préparer ou suivre sa propre action de victime, jamais pour constituer un
 fichier consultable au-delà de son propre dossier. En conséquence :
 
-- Le modèle `PersonneMiseEnCause` a `ticketId` **unique** (un enregistrement
-  par ticket, jamais partagé) et **aucun index** sur
-  `nom`/`fonction`/`dateFaits`/`horaireFaits`/`recurrent` — rien ne permet
-  une requête « tous les tickets mentionnant telle personne ».
+- Le modèle `PersonneMiseEnCause` peut avoir plusieurs entrées pour un même
+  ticket (plusieurs personnes mises en cause dans un même signalement), mais
+  chaque entrée reste liée à un seul `ticketId` — jamais partagée ni
+  réutilisée entre tickets. **Aucun index** sur `nom`/`fonction`/`recurrent`
+  — rien ne permet une requête « tous les tickets mentionnant telle
+  personne ».
 - **Un seul point d'accès en lecture existe dans tout le code** :
-  `lib/personneMiseEnCause.ts` -> `recupererPersonneMiseEnCause`, qui
-  n'accepte qu'un `ticketId` précis (jamais un critère de recherche) et ne
-  fait jamais de `findMany`/`groupBy`/`aggregate` sur cette table.
+  `lib/personneMiseEnCause.ts` -> `recupererPersonnesMiseEnCause`, qui
+  n'accepte qu'un `ticketId` précis (jamais un critère de recherche) ; le
+  seul `findMany` sur cette table est là, systématiquement filtré par ce
+  seul `ticketId`, jamais par contenu.
 - Visible uniquement par l'établissement instructeur *de ce ticket précis*,
   et par l'association tierce en charge de la triangulation. Le rectorat ne
   le voit **jamais**, sauf pour un ticket qu'il a explicitement escaladé —

@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { STATUTS_SUITE_JUDICIAIRE } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
+import DateFaitsLigne from "@/components/DateFaitsLigne";
 
 export default async function ParentPage({
   searchParams,
@@ -80,6 +81,7 @@ export default async function ParentPage({
                 </span>
               </div>
               <p className="text-sm text-slate-600">{ticket.contenu}</p>
+              <DateFaitsLigne ticket={ticket} />
 
               {ticket.reponseContenu && (
                 <div className="rounded-lg bg-slate-50 p-3 text-sm">
