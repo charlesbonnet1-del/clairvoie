@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { escaladerSiSilence } from "@/lib/tickets";
 
+// Force le rendu à la requête (voir app/api/dashboard/stats/route.ts pour
+// le détail) : ce GET ne doit jamais être exécuté au moment du build.
+export const dynamic = "force-dynamic";
+
 // Destiné à être déclenché par Vercel Cron. Si CRON_SECRET est défini côté
 // serveur, l'appel doit porter l'en-tête Authorization: Bearer <secret>.
 export async function GET(req: NextRequest) {
