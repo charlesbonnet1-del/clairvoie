@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { VERDICTS, TYPES_CONTACT } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
+import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
 
 const LABEL_TYPE_CONTACT: Record<string, string> = {
   email: "Email",
@@ -32,6 +33,15 @@ export default async function AssociationPage({
     include: { etablissement: { include: { commune: true } } },
     orderBy: { createdAt: "asc" },
   });
+
+  const personnesMiseEnCause = new Map(
+    await Promise.all(
+      aTrianguler.map(async (ticket) => {
+        const personne = await recupererPersonneMiseEnCause({ ticketId: ticket.id, identity });
+        return [ticket.id, personne] as const;
+      })
+    )
+  );
 
   const dejaTraites = await prisma.ticket.findMany({
     where: { statut: { in: ["trianguléfondé", "trianguléinfondé"] } },
@@ -155,6 +165,24 @@ export default async function AssociationPage({
               <div className="rounded-lg bg-slate-50 p-3 text-sm">
                 <p className="font-medium text-slate-700">Réponse de l&apos;établissement</p>
                 <p className="text-slate-600">{ticket.reponseContenu}</p>
+              </div>
+            )}
+            {personnesMiseEnCause.get(ticket.id) && (
+              <div className="rounded-lg bg-slate-50 p-3 text-sm">
+                <p className="font-medium text-slate-700">Personne mise en cause</p>
+                {personnesMiseEnCause.get(ticket.id)!.nom && (
+                  <p className="text-slate-600">Nom : {personnesMiseEnCause.get(ticket.id)!.nom}</p>
+                )}
+                {personnesMiseEnCause.get(ticket.id)!.fonction && (
+                  <p className="text-slate-600">
+                    Fonction : {personnesMiseEnCause.get(ticket.id)!.fonction}
+                  </p>
+                )}
+                {personnesMiseEnCause.get(ticket.id)!.contexte && (
+                  <p className="text-slate-600">
+                    Contexte : {personnesMiseEnCause.get(ticket.id)!.contexte}
+                  </p>
+                )}
               </div>
             )}
             <form

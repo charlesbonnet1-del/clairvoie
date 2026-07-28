@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma";
 import { hashPassword } from "../lib/password";
 import { appendAuditLog } from "../lib/hashchain";
 import { escaladerSiSilence } from "../lib/tickets";
+import { enregistrerPersonneMiseEnCause } from "../lib/personneMiseEnCause";
 
 function daysAgo(days: number, hours = 0): Date {
   return new Date(Date.now() - (days * 24 + hours) * 60 * 60 * 1000);
@@ -28,6 +29,7 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.suiteJudiciaire.deleteMany();
   await prisma.tentativeContact.deleteMany();
+  await prisma.personneMiseEnCause.deleteMany();
   await prisma.ticket.deleteMany();
   await prisma.alerteQualiteDonnees.deleteMany();
   await prisma.contactCanal.deleteMany();
@@ -276,6 +278,12 @@ async function main() {
   await log(t6.id, "verdict_fondé", "asso-demo-1");
   await prisma.suiteJudiciaire.create({ data: { ticketId: t6.id, statut: "transmis" } });
   await log(t6.id, "suite_judiciaire_declaree", p2);
+  await enregistrerPersonneMiseEnCause({
+    ticketId: t6.id,
+    nom: "Surveillant non identifié nommément par le parent",
+    fonction: "surveillant",
+    contexte: "Cour de récréation, pause méridienne",
+  });
 
   // T7 — ouvert, très récent
   const t7 = await prisma.ticket.create({
@@ -364,6 +372,11 @@ async function main() {
   });
   await log(t11.id, "creation", p2);
   await log(t11.id, "escalade_silence", "system:cron");
+  await enregistrerPersonneMiseEnCause({
+    ticketId: t11.id,
+    fonction: "autre élève",
+    contexte: "Groupe de 3 élèves de la même classe, sur le trajet de la cantine",
+  });
 
   // T12 — clôturé par accord mutuel, fenêtre dépassée, avec suite judiciaire "sans_nouvelle"
   const t12 = await prisma.ticket.create({

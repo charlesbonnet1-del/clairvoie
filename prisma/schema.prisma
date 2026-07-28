@@ -176,6 +176,31 @@ model Ticket {
   auditLogs         AuditLog[]
   suitesJudiciaires SuiteJudiciaire[]
   tentativesContact TentativeContact[]
+  personneMiseEnCause PersonneMiseEnCause?
+}
+
+// ---------------------------------------------------------------------------
+// Identification de la personne mise en cause — strictement scopée au
+// ticket (article 46 Loi Informatique et Libertés : un particulier ne peut
+// traiter une donnée relative à une infraction que pour préparer ou suivre
+// sa propre action de victime, jamais pour constituer un fichier
+// consultable au-delà de son propre dossier).
+//
+// ticketId est @unique : un seul enregistrement par ticket, jamais partagé.
+// Volontairement AUCUN index sur nom/fonction/contexte : n'ajoute jamais un
+// tel index, il rendrait possible/performante une requête du type "tous les
+// tickets mentionnant telle personne", ce que ce modèle doit précisément
+// empêcher. Le seul point d'accès autorisé à cette table est
+// lib/personneMiseEnCause.ts -> recupererPersonneMiseEnCause, qui ne fait
+// jamais de findMany/groupBy dessus — voir les tests dédiés.
+// ---------------------------------------------------------------------------
+model PersonneMiseEnCause {
+  id       String  @id @default(cuid())
+  ticketId String  @unique
+  ticket   Ticket  @relation(fields: [ticketId], references: [id])
+  nom      String?
+  fonction String? // ex. "enseignant", "animateur périscolaire", "autre élève"
+  contexte String? // précisions utiles à l'investigation, ex. classe, horaire habituel
 }
 
 // ---------------------------------------------------------------------------

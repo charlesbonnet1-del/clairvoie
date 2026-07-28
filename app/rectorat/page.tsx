@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
 
 export default async function RectoratPage() {
   const identity = await getSession();
@@ -13,6 +14,17 @@ export default async function RectoratPage() {
     include: { etablissement: { include: { commune: true } } },
     orderBy: { escaladeAt: "desc" },
   });
+
+  // Un ticket escaladé précis remonte son propre contenu — jamais une vue
+  // consolidée sur la personne mise en cause à travers plusieurs dossiers.
+  const personnesMiseEnCause = new Map(
+    await Promise.all(
+      tickets.map(async (ticket) => {
+        const personne = await recupererPersonneMiseEnCause({ ticketId: ticket.id, identity });
+        return [ticket.id, personne] as const;
+      })
+    )
+  );
 
   return (
     <div className="space-y-6">
@@ -40,6 +52,24 @@ export default async function RectoratPage() {
               <span className="badge badge-escaladé">Escaladé</span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
+            {personnesMiseEnCause.get(ticket.id) && (
+              <div className="rounded-lg bg-slate-50 p-3 text-sm">
+                <p className="font-medium text-slate-700">Personne mise en cause</p>
+                {personnesMiseEnCause.get(ticket.id)!.nom && (
+                  <p className="text-slate-600">Nom : {personnesMiseEnCause.get(ticket.id)!.nom}</p>
+                )}
+                {personnesMiseEnCause.get(ticket.id)!.fonction && (
+                  <p className="text-slate-600">
+                    Fonction : {personnesMiseEnCause.get(ticket.id)!.fonction}
+                  </p>
+                )}
+                {personnesMiseEnCause.get(ticket.id)!.contexte && (
+                  <p className="text-slate-600">
+                    Contexte : {personnesMiseEnCause.get(ticket.id)!.contexte}
+                  </p>
+                )}
+              </div>
+            )}
             <p className="text-xs text-slate-400">
               Escaladé le {ticket.escaladeAt?.toLocaleString("fr-FR") ?? "—"}
             </p>

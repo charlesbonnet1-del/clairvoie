@@ -394,6 +394,27 @@ export default function SignalementForm() {
         />
       </div>
 
+      <div className="rounded-lg border border-dashed border-slate-300 p-3 space-y-2">
+        <p className="text-xs font-medium text-slate-600">
+          Personne mise en cause (optionnel)
+        </p>
+        <p className="text-xs text-slate-400">
+          Aide l&apos;établissement à instruire votre signalement — à ne remplir que si
+          vous le souhaitez, un signalement reste déposable sans cette information.
+        </p>
+        <input className="input" name="personneNom" placeholder="Nom (si connu)" />
+        <input
+          className="input"
+          name="personneFonction"
+          placeholder="Fonction (ex. enseignant, animateur périscolaire, autre élève…)"
+        />
+        <input
+          className="input"
+          name="personneContexte"
+          placeholder="Contexte utile (ex. classe, horaire habituel…)"
+        />
+      </div>
+
       <button type="submit" className="btn btn-primary w-full" disabled={!formValide}>
         Déposer le signalement
       </button>

@@ -183,6 +183,38 @@ Vérifié par `tests/test_delai_demarre_a_reception_confirmee.test.ts`,
 `tests/test_api_annuaire_fallback_cache.test.ts` et
 `tests/test_coordonnee_api_reste_non_verifiee.test.ts`.
 
+## Identification de la personne mise en cause — strictement scopée au ticket
+
+Le formulaire de dépôt propose, en option, d'identifier la personne mise en
+cause (nom, fonction, contexte) — jamais obligatoire, un signalement reste
+déposable sans cette information.
+
+Cadre légal strict (article 46 loi Informatique et Libertés) : un
+particulier ne peut traiter une donnée relative à une infraction que pour
+préparer ou suivre sa propre action de victime, jamais pour constituer un
+fichier consultable au-delà de son propre dossier. En conséquence :
+
+- Le modèle `PersonneMiseEnCause` a `ticketId` **unique** (un enregistrement
+  par ticket, jamais partagé) et **aucun index** sur `nom`/`fonction`/
+  `contexte` — rien ne permet une requête « tous les tickets mentionnant
+  telle personne ».
+- **Un seul point d'accès en lecture existe dans tout le code** :
+  `lib/personneMiseEnCause.ts` -> `recupererPersonneMiseEnCause`, qui
+  n'accepte qu'un `ticketId` précis (jamais un critère de recherche) et ne
+  fait jamais de `findMany`/`groupBy`/`aggregate` sur cette table.
+- Visible uniquement par l'établissement instructeur *de ce ticket précis*,
+  et par l'association tierce en charge de la triangulation. Le rectorat ne
+  le voit **jamais**, sauf pour un ticket qu'il a explicitement escaladé —
+  et uniquement le contenu de ce ticket-là, jamais une vue consolidée sur la
+  personne. Jamais exposé sur le dashboard public.
+- Aucune fonctionnalité de recoupement entre tickets (pas de hashing à des
+  fins de matching, pas de détection de récidive) — volontairement absente
+  du schéma ; une telle fonctionnalité nécessiterait une validation
+  juridique et une autorisation CNIL dédiées avant toute implémentation.
+
+Vérifié par `tests/test_personne_mise_en_cause_non_agregable.test.ts` et
+`tests/test_acces_restreint_personne_mise_en_cause.test.ts`.
+
 ## Jeu de données de démonstration
 
 Le seed (`prisma/seed.ts`) génère :

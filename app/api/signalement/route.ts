@@ -3,6 +3,7 @@ import { requireRole, UnauthorizedError } from "@/lib/auth";
 import { creerSignalement, RegleMetierError } from "@/lib/tickets";
 import { resoudreEtablissement, ajouterContactSecondaireParent } from "@/lib/etablissements";
 import { tenterContactEtablissement } from "@/lib/contactVerification";
+import { enregistrerPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
 import { CATEGORIES, TYPES_CONTACT, deriverGraviteDepuisCategorie } from "@/config";
 
 export async function POST(req: NextRequest) {
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
     const categorie = String(formData.get("categorie") ?? "");
     const contenu = String(formData.get("contenu") ?? "");
     const contactsSecondairesJson = String(formData.get("contactsSecondairesJson") ?? "[]");
+    const personneNom = String(formData.get("personneNom") ?? "");
+    const personneFonction = String(formData.get("personneFonction") ?? "");
+    const personneContexte = String(formData.get("personneContexte") ?? "");
 
     if (!communeNom || !etablissementNom || !categorie || !contenu.trim()) {
       return NextResponse.redirect(
@@ -73,6 +77,13 @@ export async function POST(req: NextRequest) {
       categorie,
       contenu,
       gravite: deriverGraviteDepuisCategorie(categorie),
+    });
+
+    await enregistrerPersonneMiseEnCause({
+      ticketId: ticket.id,
+      nom: personneNom,
+      fonction: personneFonction,
+      contexte: personneContexte,
     });
 
     // Tente automatiquement de délivrer le signalement à l'établissement par

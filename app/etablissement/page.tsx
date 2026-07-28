@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { RESPONSE_DEADLINE_HOURS } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
+import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
 
 function delaiRestant(receptionConfirmeeAt: Date): string {
   const deadline = new Date(
@@ -38,6 +39,15 @@ export default async function EtablissementPage({
     orderBy: { createdAt: "desc" },
   });
 
+  const personnesMiseEnCause = new Map(
+    await Promise.all(
+      tickets.map(async (ticket) => {
+        const personne = await recupererPersonneMiseEnCause({ ticketId: ticket.id, identity });
+        return [ticket.id, personne] as const;
+      })
+    )
+  );
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-clairvoie-bleu">Signalements reçus</h1>
@@ -69,6 +79,25 @@ export default async function EtablissementPage({
               </span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
+
+            {personnesMiseEnCause.get(ticket.id) && (
+              <div className="rounded-lg bg-slate-50 p-3 text-sm">
+                <p className="font-medium text-slate-700">Personne mise en cause</p>
+                {personnesMiseEnCause.get(ticket.id)!.nom && (
+                  <p className="text-slate-600">Nom : {personnesMiseEnCause.get(ticket.id)!.nom}</p>
+                )}
+                {personnesMiseEnCause.get(ticket.id)!.fonction && (
+                  <p className="text-slate-600">
+                    Fonction : {personnesMiseEnCause.get(ticket.id)!.fonction}
+                  </p>
+                )}
+                {personnesMiseEnCause.get(ticket.id)!.contexte && (
+                  <p className="text-slate-600">
+                    Contexte : {personnesMiseEnCause.get(ticket.id)!.contexte}
+                  </p>
+                )}
+              </div>
+            )}
 
             {ticket.statut === "ouvert" && ticket.receptionConfirmeeAt && (
               <>
