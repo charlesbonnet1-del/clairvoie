@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { RESPONSE_DEADLINE_HOURS } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
 import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
+import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
 
 function delaiRestant(receptionConfirmeeAt: Date): string {
   const deadline = new Date(
@@ -81,22 +82,7 @@ export default async function EtablissementPage({
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
 
             {personnesMiseEnCause.get(ticket.id) && (
-              <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                <p className="font-medium text-slate-700">Personne mise en cause</p>
-                {personnesMiseEnCause.get(ticket.id)!.nom && (
-                  <p className="text-slate-600">Nom : {personnesMiseEnCause.get(ticket.id)!.nom}</p>
-                )}
-                {personnesMiseEnCause.get(ticket.id)!.fonction && (
-                  <p className="text-slate-600">
-                    Fonction : {personnesMiseEnCause.get(ticket.id)!.fonction}
-                  </p>
-                )}
-                {personnesMiseEnCause.get(ticket.id)!.contexte && (
-                  <p className="text-slate-600">
-                    Contexte : {personnesMiseEnCause.get(ticket.id)!.contexte}
-                  </p>
-                )}
-              </div>
+              <PersonneMiseEnCauseCard personne={personnesMiseEnCause.get(ticket.id)!} />
             )}
 
             {ticket.statut === "ouvert" && ticket.receptionConfirmeeAt && (

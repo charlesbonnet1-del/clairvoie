@@ -282,7 +282,8 @@ async function main() {
     ticketId: t6.id,
     nom: "Surveillant non identifié nommément par le parent",
     fonction: "surveillant",
-    contexte: "Cour de récréation, pause méridienne",
+    horaireFaits: "Pause méridienne, cour de récréation",
+    recurrent: true,
   });
 
   // T7 — ouvert, très récent
@@ -375,7 +376,8 @@ async function main() {
   await enregistrerPersonneMiseEnCause({
     ticketId: t11.id,
     fonction: "autre élève",
-    contexte: "Groupe de 3 élèves de la même classe, sur le trajet de la cantine",
+    horaireFaits: "Sur le trajet de la cantine",
+    recurrent: true,
   });
 
   // T12 — clôturé par accord mutuel, fenêtre dépassée, avec suite judiciaire "sans_nouvelle"

@@ -186,8 +186,9 @@ Vérifié par `tests/test_delai_demarre_a_reception_confirmee.test.ts`,
 ## Identification de la personne mise en cause — strictement scopée au ticket
 
 Le formulaire de dépôt propose, en option, d'identifier la personne mise en
-cause (nom, fonction, contexte) — jamais obligatoire, un signalement reste
-déposable sans cette information.
+cause (nom, fonction, date et horaire des faits, caractère récurrent ou
+non) — jamais obligatoire, un signalement reste déposable sans cette
+information.
 
 Cadre légal strict (article 46 loi Informatique et Libertés) : un
 particulier ne peut traiter une donnée relative à une infraction que pour
@@ -195,9 +196,9 @@ préparer ou suivre sa propre action de victime, jamais pour constituer un
 fichier consultable au-delà de son propre dossier. En conséquence :
 
 - Le modèle `PersonneMiseEnCause` a `ticketId` **unique** (un enregistrement
-  par ticket, jamais partagé) et **aucun index** sur `nom`/`fonction`/
-  `contexte` — rien ne permet une requête « tous les tickets mentionnant
-  telle personne ».
+  par ticket, jamais partagé) et **aucun index** sur
+  `nom`/`fonction`/`dateFaits`/`horaireFaits`/`recurrent` — rien ne permet
+  une requête « tous les tickets mentionnant telle personne ».
 - **Un seul point d'accès en lecture existe dans tout le code** :
   `lib/personneMiseEnCause.ts` -> `recupererPersonneMiseEnCause`, qui
   n'accepte qu'un `ticketId` précis (jamais un critère de recherche) et ne

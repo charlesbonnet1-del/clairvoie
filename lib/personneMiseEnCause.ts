@@ -10,7 +10,7 @@ import { prisma } from "./prisma";
  * code : il ne fait jamais de findMany/groupBy/aggregate sur cette table
  * (voir tests/test_personne_mise_en_cause_non_agregable.test.ts), et
  * n'accepte qu'un ticketId précis — jamais un critère de recherche sur
- * nom/fonction/contexte.
+ * nom/fonction/date/horaire.
  *
  * Accès autorisé :
  * - ETABLISSEMENT : uniquement s'il instruit ce ticket précis
@@ -44,21 +44,26 @@ export async function recupererPersonneMiseEnCause(params: {
 
 /**
  * Enregistre l'identification de la personne mise en cause au dépôt du
- * signalement. Champ entièrement optionnel côté parent : n'écrit rien si
- * aucune des trois valeurs n'est renseignée.
+ * signalement. Champs entièrement optionnels côté parent : n'écrit rien si
+ * aucune valeur n'est renseignée.
  */
 export async function enregistrerPersonneMiseEnCause(params: {
   ticketId: string;
   nom?: string;
   fonction?: string;
-  contexte?: string;
+  dateFaits?: string;
+  horaireFaits?: string;
+  recurrent?: boolean;
 }): Promise<void> {
   const nom = params.nom?.trim() || null;
   const fonction = params.fonction?.trim() || null;
-  const contexte = params.contexte?.trim() || null;
-  if (!nom && !fonction && !contexte) return;
+  const horaireFaits = params.horaireFaits?.trim() || null;
+  const dateFaits = params.dateFaits?.trim() ? new Date(params.dateFaits.trim()) : null;
+  const recurrent = params.recurrent ?? false;
+
+  if (!nom && !fonction && !dateFaits && !horaireFaits && !recurrent) return;
 
   await prisma.personneMiseEnCause.create({
-    data: { ticketId: params.ticketId, nom, fonction, contexte },
+    data: { ticketId: params.ticketId, nom, fonction, dateFaits, horaireFaits, recurrent },
   });
 }

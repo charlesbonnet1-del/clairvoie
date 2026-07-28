@@ -408,11 +408,29 @@ export default function SignalementForm() {
           name="personneFonction"
           placeholder="Fonction (ex. enseignant, animateur périscolaire, autre élève…)"
         />
-        <input
-          className="input"
-          name="personneContexte"
-          placeholder="Contexte utile (ex. classe, horaire habituel…)"
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="label text-xs" htmlFor="personneDateFaits">
+              Date des faits
+            </label>
+            <input className="input" type="date" id="personneDateFaits" name="personneDateFaits" />
+          </div>
+          <div>
+            <label className="label text-xs" htmlFor="personneHoraireFaits">
+              Horaire des faits
+            </label>
+            <input
+              className="input"
+              id="personneHoraireFaits"
+              name="personneHoraireFaits"
+              placeholder="ex. 14h30, pendant la récréation…"
+            />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input type="checkbox" name="personneRecurrent" value="oui" className="h-4 w-4" />
+          Ces faits se seraient déjà produits (récurrent)
+        </label>
       </div>
 
       <button type="submit" className="btn btn-primary w-full" disabled={!formValide}>

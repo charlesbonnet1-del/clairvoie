@@ -72,7 +72,9 @@ describe("Principe (article 46 LIL) — PersonneMiseEnCause non agrégeable entr
     expect(paramsBlock).toMatch(/ticketId/);
     expect(paramsBlock).not.toMatch(/nom/i);
     expect(paramsBlock).not.toMatch(/fonction/i);
-    expect(paramsBlock).not.toMatch(/contexte/i);
+    expect(paramsBlock).not.toMatch(/dateFaits/i);
+    expect(paramsBlock).not.toMatch(/horaireFaits/i);
+    expect(paramsBlock).not.toMatch(/recurrent/i);
   });
 
   it("aucune route API n'expose de recherche par personne mise en cause", () => {

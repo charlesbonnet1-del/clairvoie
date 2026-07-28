@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
     const contactsSecondairesJson = String(formData.get("contactsSecondairesJson") ?? "[]");
     const personneNom = String(formData.get("personneNom") ?? "");
     const personneFonction = String(formData.get("personneFonction") ?? "");
-    const personneContexte = String(formData.get("personneContexte") ?? "");
+    const personneDateFaits = String(formData.get("personneDateFaits") ?? "");
+    const personneHoraireFaits = String(formData.get("personneHoraireFaits") ?? "");
+    const personneRecurrent = formData.get("personneRecurrent") === "oui";
 
     if (!communeNom || !etablissementNom || !categorie || !contenu.trim()) {
       return NextResponse.redirect(
@@ -83,7 +85,9 @@ export async function POST(req: NextRequest) {
       ticketId: ticket.id,
       nom: personneNom,
       fonction: personneFonction,
-      contexte: personneContexte,
+      dateFaits: personneDateFaits,
+      horaireFaits: personneHoraireFaits,
+      recurrent: personneRecurrent,
     });
 
     // Tente automatiquement de délivrer le signalement à l'établissement par

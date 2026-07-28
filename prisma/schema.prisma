@@ -195,12 +195,14 @@ model Ticket {
 // jamais de findMany/groupBy dessus — voir les tests dédiés.
 // ---------------------------------------------------------------------------
 model PersonneMiseEnCause {
-  id       String  @id @default(cuid())
-  ticketId String  @unique
-  ticket   Ticket  @relation(fields: [ticketId], references: [id])
-  nom      String?
-  fonction String? // ex. "enseignant", "animateur périscolaire", "autre élève"
-  contexte String? // précisions utiles à l'investigation, ex. classe, horaire habituel
+  id           String    @id @default(cuid())
+  ticketId     String    @unique
+  ticket       Ticket    @relation(fields: [ticketId], references: [id])
+  nom          String?
+  fonction     String? // ex. "enseignant", "animateur périscolaire", "autre élève"
+  dateFaits    DateTime? // date des faits, si connue
+  horaireFaits String? // moment approximatif, ex. "14h30", "pendant la récréation du matin"
+  recurrent    Boolean   @default(false) // les faits se seraient déjà produits
 }
 
 // ---------------------------------------------------------------------------

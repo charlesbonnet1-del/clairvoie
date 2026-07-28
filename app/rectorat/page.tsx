@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recupererPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
+import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
 
 export default async function RectoratPage() {
   const identity = await getSession();
@@ -53,22 +54,7 @@ export default async function RectoratPage() {
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
             {personnesMiseEnCause.get(ticket.id) && (
-              <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                <p className="font-medium text-slate-700">Personne mise en cause</p>
-                {personnesMiseEnCause.get(ticket.id)!.nom && (
-                  <p className="text-slate-600">Nom : {personnesMiseEnCause.get(ticket.id)!.nom}</p>
-                )}
-                {personnesMiseEnCause.get(ticket.id)!.fonction && (
-                  <p className="text-slate-600">
-                    Fonction : {personnesMiseEnCause.get(ticket.id)!.fonction}
-                  </p>
-                )}
-                {personnesMiseEnCause.get(ticket.id)!.contexte && (
-                  <p className="text-slate-600">
-                    Contexte : {personnesMiseEnCause.get(ticket.id)!.contexte}
-                  </p>
-                )}
-              </div>
+              <PersonneMiseEnCauseCard personne={personnesMiseEnCause.get(ticket.id)!} />
             )}
             <p className="text-xs text-slate-400">
               Escaladé le {ticket.escaladeAt?.toLocaleString("fr-FR") ?? "—"}

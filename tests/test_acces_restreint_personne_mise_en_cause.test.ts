@@ -45,7 +45,9 @@ describe("Accès restreint à PersonneMiseEnCause", () => {
       ticketId: ticketOuvertId,
       nom: "Jean Dupont",
       fonction: "animateur périscolaire",
-      contexte: "Sortie scolaire du 12 mars",
+      dateFaits: "2026-03-12",
+      horaireFaits: "Sortie scolaire, après-midi",
+      recurrent: true,
     });
 
     const ticketEscalade = await creerSignalement({
