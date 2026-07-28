@@ -6,10 +6,8 @@ dist
 *.log
 .env
 .env*.local
-prisma/dev.db
-prisma/dev.db-journal
-prisma/test.db
-prisma/test.db-journal
+prisma/*.db
+prisma/*.db-journal
 .DS_Store
 coverage
 next-env.d.ts
