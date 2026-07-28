@@ -43,17 +43,20 @@ cp .env.example .env
 
 ```bash
 npm install
-npx prisma migrate dev --name init
+npx prisma db push
 npx prisma db seed
 npm run dev
 ```
 
 L'application est disponible sur http://localhost:3000.
 
-`npx prisma migrate dev` n'est nécessaire qu'une fois (il crée les tables
-sur votre base Supabase et génère `prisma/migrations/`, à committer). Pour
-les lancements suivants, `npm run dev` suffit. Pour repartir de zéro, videz
-les tables depuis l'éditeur SQL Supabase puis relancez `npx prisma db seed`.
+Ce projet utilise `prisma db push` plutôt que `prisma migrate dev` : pas de
+dossier `prisma/migrations/` à maintenir, le schéma est simplement synchronisé
+directement sur la base à chaque changement de `schema.prisma`. `db push`
+n'est nécessaire qu'après une modification du schéma (il crée les tables au
+premier lancement). Pour les lancements suivants, `npm run dev` suffit. Pour
+repartir de zéro, videz les tables depuis l'éditeur SQL Supabase puis
+relancez `npx prisma db seed`.
 
 ### Lancer les tests
 
@@ -177,14 +180,15 @@ prête pour la production :
    - `DATABASE_URL` — connexion Supabase via le pooler (port `6543`)
    - `DIRECT_URL` — connexion Supabase directe (port `5432`)
    - `SESSION_SECRET` — une valeur aléatoire longue
-4. Committez `prisma/migrations/` (généré par `npx prisma migrate dev` en
-   local, voir plus haut), puis, dans les paramètres du projet Vercel
-   (**Settings → Build & Development Settings → Build Command**), remplacez
-   la commande de build par :
-   `npx prisma migrate deploy && next build` — pour aussi repeupler la base
-   de démonstration à chaque déploiement (preview uniquement, jamais en
-   production réelle) :
-   `npx prisma migrate deploy && npx prisma db seed && next build`.
+4. Dans les paramètres du projet Vercel (**Settings → Build & Development
+   Settings → Build Command**), remplacez la commande de build par :
+   `npx prisma db push --accept-data-loss && next build` — ou, pour aussi
+   repeupler la base de démonstration à chaque déploiement (preview
+   uniquement, jamais sur une base contenant de vraies données) :
+   `npx prisma db push --accept-data-loss && npx prisma db seed && next build`.
+   (`db push` synchronise directement `schema.prisma` sur la base — ce
+   projet n'utilise pas `prisma migrate`, voir la section Base de données
+   ci-dessus.)
 5. (Optionnel) Configurez un Vercel Cron Job pointant vers
    `/api/cron/escalade` pour déclencher automatiquement l'escalade des
    signalements en silence — voir la
