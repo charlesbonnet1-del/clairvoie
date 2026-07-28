@@ -1,0 +1,111 @@
+// Schéma Prisma — Clairvoie MVP
+// SQLite en local ; migrable vers Postgres en production sans réécriture
+// (types utilisés sont compatibles avec les deux, hormis @default(cuid()) déjà portable).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identité — jamais mêlée au contenu des signalements (Ticket) au niveau du
+// schéma. Le seul pont entre les deux mondes est le pseudoId, opaque.
+// ---------------------------------------------------------------------------
+model Identity {
+  id            String   @id @default(cuid())
+  pseudoId      String   @unique
+  // "PARENT" | "ETABLISSEMENT" | "ASSOCIATION_TIERCE" | "RECTORAT" | "ADMIN"
+  // Le connecteur SQLite ne supporte pas les enums natifs Prisma : la liste
+  // exhaustive des rôles autorisés vit dans config.ts (export ROLES), pas
+  // dans le schéma. C'est cette liste, pas ce champ, que le test du
+  // principe 2 (aucun rôle judiciaire) vérifie.
+  role          String
+  displayName   String // pour la démo uniquement, jamais exposé publiquement
+  email         String   @unique
+  passwordHash  String
+  // Rattachement pour les comptes ETABLISSEMENT (quel établissement gèrent-ils).
+  etablissementId String?
+  createdAt     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Géographie — permet la granularité dynamique du tableau de bord public.
+// ---------------------------------------------------------------------------
+model Commune {
+  id             String          @id @default(cuid())
+  nom            String
+  epci           String
+  departement    String
+  etablissements Etablissement[]
+}
+
+model Etablissement {
+  id        String   @id @default(cuid())
+  nom       String
+  communeId String
+  commune   Commune  @relation(fields: [communeId], references: [id])
+  tickets   Ticket[]
+}
+
+// ---------------------------------------------------------------------------
+// Contenu du signalement — jamais de nom en clair ici, uniquement des
+// identifiants pseudonymes et des identifiants de structures.
+// ---------------------------------------------------------------------------
+model Ticket {
+  id              String   @id @default(cuid())
+  parentPseudoId  String
+  etablissementId String
+  etablissement   Etablissement @relation(fields: [etablissementId], references: [id])
+  categorie       String
+  contenu         String // en clair pour le MVP ; chiffrement par enregistrement en phase 2
+  gravite         String // "legere" | "moderee" | "grave"
+  statut          String   @default("ouvert")
+  // "ouvert" | "répondu" | "escaladé" | "trianguléfondé" | "trianguléinfondé" | "clôturé_accord_mutuel"
+
+  reponseContenu  String?
+  reponduAt       DateTime?
+  escaladeAt      DateTime?
+
+  verdict         String? // "fondé" | "à_investiguer" | "infondé"
+  verdictAt       DateTime?
+
+  clotureAt                DateTime?
+  clotureRevocableJusqua    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs         AuditLog[]
+  suitesJudiciaires SuiteJudiciaire[]
+}
+
+// ---------------------------------------------------------------------------
+// Journal d'audit à chaînage de hash — infalsifiable et traçable.
+// ---------------------------------------------------------------------------
+model AuditLog {
+  id            String   @id @default(cuid())
+  ticketId      String
+  ticket        Ticket   @relation(fields: [ticketId], references: [id])
+  action        String
+  // Identifiant pseudonyme du compte authentifié à l'origine de l'action (provenance).
+  acteurPseudo  String
+  hashPrecedent String
+  hashCourant   String
+  timestamp     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Suite judiciaire — purement auto-déclarative par le parent, jamais
+// vérifiée, jamais exposée individuellement sur le dashboard public.
+// ---------------------------------------------------------------------------
+model SuiteJudiciaire {
+  id          String   @id @default(cuid())
+  ticketId    String
+  ticket      Ticket   @relation(fields: [ticketId], references: [id])
+  statut      String // "transmis" | "classé_sans_suite" | "renvoi_tribunal" | "condamnation" | "sans_nouvelle"
+  declaredAt  DateTime @default(now())
+}

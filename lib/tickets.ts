@@ -1,0 +1,194 @@
+import { prisma } from "./prisma";
+import { appendAuditLog } from "./hashchain";
+import { RESPONSE_DEADLINE_HOURS, RETRACTION_WINDOW_HOURS } from "@/config";
+
+export class RegleMetierError extends Error {}
+
+export async function creerSignalement(params: {
+  parentPseudoId: string;
+  etablissementId: string;
+  categorie: string;
+  contenu: string;
+  gravite: string;
+}) {
+  const ticket = await prisma.ticket.create({
+    data: {
+      parentPseudoId: params.parentPseudoId,
+      etablissementId: params.etablissementId,
+      categorie: params.categorie,
+      contenu: params.contenu,
+      gravite: params.gravite,
+      statut: "ouvert",
+    },
+  });
+  await appendAuditLog({
+    ticketId: ticket.id,
+    action: "creation",
+    acteurPseudo: params.parentPseudoId,
+  });
+  return ticket;
+}
+
+export async function repondreSignalement(params: {
+  ticketId: string;
+  acteurPseudo: string;
+  reponseContenu: string;
+}) {
+  const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
+  if (!ticket) throw new RegleMetierError("Signalement introuvable.");
+  if (ticket.statut !== "ouvert") {
+    throw new RegleMetierError("Ce signalement a déjà reçu une réponse ou a été escaladé.");
+  }
+  const updated = await prisma.ticket.update({
+    where: { id: params.ticketId },
+    data: {
+      statut: "répondu",
+      reponseContenu: params.reponseContenu,
+      reponduAt: new Date(),
+    },
+  });
+  await appendAuditLog({
+    ticketId: params.ticketId,
+    action: "reponse",
+    acteurPseudo: params.acteurPseudo,
+  });
+  return updated;
+}
+
+/** Escalade automatiquement (silence de l'établissement) les tickets ouverts
+ * depuis plus de RESPONSE_DEADLINE_HOURS sans réponse. Appelé par le cron. */
+export async function escaladerSiSilence(acteurPseudo = "system:cron") {
+  const seuil = new Date(Date.now() - RESPONSE_DEADLINE_HOURS * 60 * 60 * 1000);
+  const aEscalader = await prisma.ticket.findMany({
+    where: { statut: "ouvert", createdAt: { lt: seuil } },
+  });
+
+  const escalades = [];
+  for (const ticket of aEscalader) {
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { statut: "escaladé", escaladeAt: new Date() },
+    });
+    await appendAuditLog({
+      ticketId: ticket.id,
+      action: "escalade_silence",
+      acteurPseudo,
+    });
+    escalades.push(updated);
+  }
+  return escalades;
+}
+
+export async function trianguler(params: {
+  ticketId: string;
+  acteurPseudo: string;
+  verdict: "fondé" | "à_investiguer" | "infondé";
+}) {
+  const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
+  if (!ticket) throw new RegleMetierError("Signalement introuvable.");
+
+  const statutParVerdict: Record<string, string> = {
+    fondé: "trianguléfondé",
+    à_investiguer: "escaladé",
+    infondé: "trianguléinfondé",
+  };
+
+  const updated = await prisma.ticket.update({
+    where: { id: params.ticketId },
+    data: {
+      verdict: params.verdict,
+      verdictAt: new Date(),
+      statut: statutParVerdict[params.verdict],
+    },
+  });
+  await appendAuditLog({
+    ticketId: params.ticketId,
+    action: `verdict_${params.verdict}`,
+    acteurPseudo: params.acteurPseudo,
+  });
+  return updated;
+}
+
+/**
+ * Clôture par accord mutuel (principe 8). Si le signalement est classé
+ * "grave", la clôture directe est refusée : elle doit passer par la
+ * validation de l'association tierce (triangulation -> verdict). Sinon, le
+ * statut reste révocable pendant RETRACTION_WINDOW_HOURS.
+ */
+export async function cloturerParAccordMutuel(params: {
+  ticketId: string;
+  acteurPseudo: string;
+}) {
+  const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
+  if (!ticket) throw new RegleMetierError("Signalement introuvable.");
+
+  if (ticket.gravite === "grave") {
+    throw new RegleMetierError(
+      "Clôture directe refusée pour un signalement grave : la validation de l'association tierce est requise."
+    );
+  }
+
+  const now = new Date();
+  const revocableJusqua = new Date(now.getTime() + RETRACTION_WINDOW_HOURS * 60 * 60 * 1000);
+
+  const updated = await prisma.ticket.update({
+    where: { id: params.ticketId },
+    data: {
+      statut: "clôturé_accord_mutuel",
+      clotureAt: now,
+      clotureRevocableJusqua: revocableJusqua,
+    },
+  });
+  await appendAuditLog({
+    ticketId: params.ticketId,
+    action: "cloture_accord_mutuel",
+    acteurPseudo: params.acteurPseudo,
+  });
+  return updated;
+}
+
+/** Révocation de la clôture par accord mutuel, tant que la fenêtre de
+ * rétractation n'est pas dépassée. */
+export async function retracterCloture(params: {
+  ticketId: string;
+  acteurPseudo: string;
+}) {
+  const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
+  if (!ticket) throw new RegleMetierError("Signalement introuvable.");
+  if (ticket.statut !== "clôturé_accord_mutuel") {
+    throw new RegleMetierError("Ce signalement n'est pas clôturé par accord mutuel.");
+  }
+  if (!ticket.clotureRevocableJusqua || ticket.clotureRevocableJusqua < new Date()) {
+    throw new RegleMetierError("La fenêtre de rétractation est dépassée.");
+  }
+
+  const updated = await prisma.ticket.update({
+    where: { id: params.ticketId },
+    data: { statut: "escaladé", clotureAt: null, clotureRevocableJusqua: null },
+  });
+  await appendAuditLog({
+    ticketId: params.ticketId,
+    action: "retractation_cloture",
+    acteurPseudo: params.acteurPseudo,
+  });
+  return updated;
+}
+
+export async function declarerSuiteJudiciaire(params: {
+  ticketId: string;
+  acteurPseudo: string;
+  statut: string;
+}) {
+  const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
+  if (!ticket) throw new RegleMetierError("Signalement introuvable.");
+
+  const suite = await prisma.suiteJudiciaire.create({
+    data: { ticketId: params.ticketId, statut: params.statut },
+  });
+  await appendAuditLog({
+    ticketId: params.ticketId,
+    action: "suite_judiciaire_declaree",
+    acteurPseudo: params.acteurPseudo,
+  });
+  return suite;
+}
