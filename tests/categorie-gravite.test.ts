@@ -5,7 +5,7 @@ import { creerSignalement, cloturerParAccordMutuel, RegleMetierError } from "@/l
 
 describe("Dérivation de la gravité à partir de la catégorie", () => {
   it("classe les catégories de violences sexuelles et physiques comme graves", () => {
-    expect(deriverGraviteDepuisCategorie("Attouchements et sévices à caractère sexuel")).toBe(
+    expect(deriverGraviteDepuisCategorie("Attouchements ou sévices à caractère sexuel")).toBe(
       "grave"
     );
     expect(deriverGraviteDepuisCategorie("Violence physique")).toBe("grave");
@@ -47,7 +47,7 @@ describe("Dérivation de la gravité à partir de la catégorie", () => {
     });
 
     it("un signalement pour attouchements ne peut pas être clôturé par accord mutuel direct", async () => {
-      const categorie = "Attouchements et sévices à caractère sexuel";
+      const categorie = "Attouchements ou sévices à caractère sexuel";
       const ticket = await creerSignalement({
         parentPseudoId: "parent-categorie-gravite",
         etablissementId,

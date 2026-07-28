@@ -47,7 +47,7 @@ export type Gravite = (typeof GRAVITES)[number];
  */
 export const CATEGORIES = [
   "Violence physique",
-  "Attouchements et sévices à caractère sexuel",
+  "Attouchements ou sévices à caractère sexuel",
   "Violence verbale ou psychologique",
   "Harcèlement entre élèves",
   "Négligence de surveillance",
@@ -57,7 +57,7 @@ export type Categorie = (typeof CATEGORIES)[number];
 
 export const CATEGORIE_GRAVITE: Record<Categorie, Gravite> = {
   "Violence physique": "grave",
-  "Attouchements et sévices à caractère sexuel": "grave",
+  "Attouchements ou sévices à caractère sexuel": "grave",
   "Violence verbale ou psychologique": "moderee",
   "Harcèlement entre élèves": "moderee",
   "Négligence de surveillance": "legere",
