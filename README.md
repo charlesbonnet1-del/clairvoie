@@ -15,31 +15,45 @@ sur une preview Vercel, avec des comptes de démonstration pré-remplis.
 ## Stack
 
 - Next.js 14 (App Router) + TypeScript + Tailwind CSS
-- Prisma + SQLite en local (migrable vers Postgres sans réécriture du modèle
-  de données, à l'exception du champ `role`, voir plus bas)
+- Prisma + Postgres (Supabase)
 - Authentification de démonstration : email/mot de passe, sans intégration
   FranceConnect/EduConnect réelle
 - Vitest pour les tests
+
+## Base de données (Supabase)
+
+Ce projet utilise Postgres partout (local, tests, production) via un projet
+Supabase — pas de base locale à installer.
+
+1. Créez un projet sur [supabase.com](https://supabase.com).
+2. Cliquez sur **Connect** (en haut du tableau de bord du projet), onglet
+   **ORMs** (ou **Connection string**), et récupérez deux URLs :
+   - **Transaction pooler** (port `6543`) → `DATABASE_URL`
+   - **Direct connection** (port `5432`) → `DIRECT_URL`, requise par Prisma
+     pour les migrations (le pooler ne les supporte pas)
+3. Copiez `.env.example` vers `.env` et renseignez ces deux valeurs, ainsi
+   que `SESSION_SECRET` (une chaîne aléatoire quelconque en local).
+
+```bash
+cp .env.example .env
+# éditez .env avec vos vraies valeurs Supabase
+```
 
 ## Démarrage rapide
 
 ```bash
 npm install
-npx prisma migrate dev
+npx prisma migrate dev --name init
 npx prisma db seed
 npm run dev
 ```
 
 L'application est disponible sur http://localhost:3000.
 
-Si `npx prisma migrate dev` a déjà été lancé une fois, `npm run dev` suffit
-ensuite (la base `prisma/dev.db` persiste). Pour repartir de zéro :
-
-```bash
-rm -f prisma/dev.db
-npx prisma migrate dev
-npx prisma db seed
-```
+`npx prisma migrate dev` n'est nécessaire qu'une fois (il crée les tables
+sur votre base Supabase et génère `prisma/migrations/`, à committer). Pour
+les lancements suivants, `npm run dev` suffit. Pour repartir de zéro, videz
+les tables depuis l'éditeur SQL Supabase puis relancez `npx prisma db seed`.
 
 ### Lancer les tests
 
@@ -47,8 +61,11 @@ npx prisma db seed
 npm test
 ```
 
-Les tests utilisent une base SQLite dédiée (`prisma/test.db`), distincte de
-`prisma/dev.db`, poussée automatiquement au premier lancement.
+Les tests tournent sur la **même base Supabase**, mais dans un schéma
+Postgres dédié (`test`), entièrement isolé du schéma `public` où vivent vos
+données de démo — voir `vitest.config.ts` et `tests/global-setup.ts`. Ils
+nécessitent donc `DIRECT_URL` dans `.env` et un accès réseau à Supabase ;
+ils ne touchent jamais aux données du schéma `public`.
 
 ## Comptes de démonstration
 
@@ -134,11 +151,10 @@ prête pour la production :
   n'est pas chiffré. Un chiffrement par enregistrement (au minimum au repos,
   idéalement de bout en bout) est indispensable avant tout traitement de
   données réelles.
-- **`Role` n'est pas un enum natif de la base de données.** SQLite (utilisé
-  en local) ne supporte pas les enums Prisma ; `Identity.role` est donc un
-  champ `String`, contraint côté applicatif par la constante `ROLES` dans
-  `config.ts`. En migrant vers Postgres, ce champ peut redevenir un enum
-  natif sans changer la logique applicative.
+- **`Role` n'est pas un enum natif de la base de données.** `Identity.role`
+  est un champ `String`, contraint côté applicatif par la constante `ROLES`
+  dans `config.ts`, plutôt qu'un enum Postgres natif — un choix de
+  simplicité, pas une contrainte technique (Postgres supporte les enums).
 - **Le lien entre comptes ETABLISSEMENT et établissement** se fait par un
   simple champ `etablissementId` sur `Identity`, sans logique de gestion de
   plusieurs comptes par établissement.
@@ -155,23 +171,24 @@ prête pour la production :
 1. Poussez ce dépôt sur GitHub (ou connectez-le directement depuis Vercel).
 2. Sur [vercel.com](https://vercel.com), créez un nouveau projet à partir du
    dépôt.
-3. Comme SQLite ne convient pas à un déploiement serverless multi-instances,
-   provisionnez une base Postgres (Vercel Postgres, Neon, Supabase…) et
-   définissez la variable d'environnement `DATABASE_URL` avec la chaîne de
-   connexion Postgres dans les paramètres du projet Vercel.
-4. Changez le `provider` du datasource dans `prisma/schema.prisma` de
-   `sqlite` à `postgresql` (le reste du schéma est compatible tel quel).
-5. Définissez également `SESSION_SECRET` (une valeur aléatoire longue) dans
-   les variables d'environnement Vercel.
-6. Dans les paramètres de build Vercel, assurez-vous que la commande de
-   build exécute les migrations avant `next build`, par exemple :
-   `npx prisma migrate deploy && npx prisma db seed && next build` (le seed
-   n'est utile que pour une preview de démonstration ; à retirer pour un
-   déploiement destiné à de vraies données).
-7. (Optionnel) Configurez un Vercel Cron Job pointant vers
+3. Dans les paramètres du projet Vercel (**Settings → Environment
+   Variables**), définissez pour l'environnement Production (et Preview si
+   vous voulez que les previews de PR utilisent la même base) :
+   - `DATABASE_URL` — connexion Supabase via le pooler (port `6543`)
+   - `DIRECT_URL` — connexion Supabase directe (port `5432`)
+   - `SESSION_SECRET` — une valeur aléatoire longue
+4. Committez `prisma/migrations/` (généré par `npx prisma migrate dev` en
+   local, voir plus haut), puis, dans les paramètres du projet Vercel
+   (**Settings → Build & Development Settings → Build Command**), remplacez
+   la commande de build par :
+   `npx prisma migrate deploy && next build` — pour aussi repeupler la base
+   de démonstration à chaque déploiement (preview uniquement, jamais en
+   production réelle) :
+   `npx prisma migrate deploy && npx prisma db seed && next build`.
+5. (Optionnel) Configurez un Vercel Cron Job pointant vers
    `/api/cron/escalade` pour déclencher automatiquement l'escalade des
    signalements en silence — voir la
    [documentation Vercel Cron Jobs](https://vercel.com/docs/cron-jobs). Si
    vous définissez `CRON_SECRET` dans les variables d'environnement, protégez
    l'appel avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.
-8. Déployez : Vercel génère une URL de preview partageable.
+6. Déployez : Vercel génère une URL de preview partageable.

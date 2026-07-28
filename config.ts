@@ -18,11 +18,10 @@ export const RESPONSE_DEADLINE_HOURS = 120;
 export const SESSION_COOKIE_NAME = "clairvoie_session";
 
 /**
- * Rôles applicatifs. Le connecteur SQLite ne supportant pas les enums natifs
- * Prisma, cette liste (et non le schéma) fait foi : Identity.role est un
- * simple champ String contraint par ce type au niveau applicatif.
- * Principe 2 non négociable : aucun rôle judiciaire ("magistrat", "juge",
- * "procureur"...) ne doit jamais y figurer.
+ * Rôles applicatifs. Identity.role est un simple champ String (schema.prisma)
+ * contraint par cette liste au niveau applicatif plutôt que par un enum
+ * Postgres natif. Principe 2 non négociable : aucun rôle judiciaire
+ * ("magistrat", "juge", "procureur"...) ne doit jamais y figurer.
  */
 export const ROLES = [
   "PARENT",
