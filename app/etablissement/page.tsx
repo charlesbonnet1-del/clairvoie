@@ -2,18 +2,12 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { RESPONSE_DEADLINE_HOURS } from "@/config";
+import { STATUT_TICKET_LABELS } from "@/lib/labels";
 
-const STATUT_LABELS: Record<string, string> = {
-  ouvert: "Ouvert",
-  répondu: "Répondu",
-  escaladé: "Escaladé",
-  trianguléfondé: "Triangulé — fondé",
-  trianguléinfondé: "Triangulé — infondé",
-  clôturé_accord_mutuel: "Clôturé par accord mutuel",
-};
-
-function delaiRestant(createdAt: Date): string {
-  const deadline = new Date(createdAt.getTime() + RESPONSE_DEADLINE_HOURS * 60 * 60 * 1000);
+function delaiRestant(receptionConfirmeeAt: Date): string {
+  const deadline = new Date(
+    receptionConfirmeeAt.getTime() + RESPONSE_DEADLINE_HOURS * 60 * 60 * 1000
+  );
   const heuresRestantes = Math.round((deadline.getTime() - Date.now()) / (1000 * 60 * 60));
   if (heuresRestantes <= 0) return "Délai dépassé";
   return `${heuresRestantes} h avant escalade automatique`;
@@ -36,8 +30,11 @@ export default async function EtablissementPage({
     );
   }
 
+  // Un établissement ne voit jamais un signalement dont la réception n'a
+  // pas été confirmée par un canal de contact vérifié : tant que ce n'est
+  // pas le cas, il ne peut pas, de fait, en avoir connaissance.
   const tickets = await prisma.ticket.findMany({
-    where: { etablissementId: identity.etablissementId },
+    where: { etablissementId: identity.etablissementId, receptionConfirmeeAt: { not: null } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -68,15 +65,15 @@ export default async function EtablissementPage({
                 </p>
               </div>
               <span className={`badge badge-${ticket.statut}`}>
-                {STATUT_LABELS[ticket.statut] ?? ticket.statut}
+                {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
               </span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
 
-            {ticket.statut === "ouvert" && (
+            {ticket.statut === "ouvert" && ticket.receptionConfirmeeAt && (
               <>
                 <p className="text-xs font-medium text-amber-700">
-                  {delaiRestant(ticket.createdAt)}
+                  {delaiRestant(ticket.receptionConfirmeeAt)}
                 </p>
                 <form
                   action={`/api/signalement/${ticket.id}/repondre`}

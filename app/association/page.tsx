@@ -1,15 +1,14 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { VERDICTS } from "@/config";
+import { VERDICTS, TYPES_CONTACT } from "@/config";
+import { STATUT_TICKET_LABELS } from "@/lib/labels";
 
-const STATUT_LABELS: Record<string, string> = {
-  ouvert: "Ouvert",
-  répondu: "Répondu",
-  escaladé: "Escaladé",
-  trianguléfondé: "Triangulé — fondé",
-  trianguléinfondé: "Triangulé — infondé",
-  clôturé_accord_mutuel: "Clôturé par accord mutuel",
+const LABEL_TYPE_CONTACT: Record<string, string> = {
+  email: "Email",
+  telephone: "Téléphone",
+  courrier_recommande_electronique: "Recommandé électronique",
+  adresse_postale: "Adresse postale",
 };
 
 export default async function AssociationPage({
@@ -21,6 +20,12 @@ export default async function AssociationPage({
   if (!identity || identity.role !== "ASSOCIATION_TIERCE") {
     redirect("/login");
   }
+
+  const verificationContactRequise = await prisma.ticket.findMany({
+    where: { statut: "verification_contact_requise" },
+    include: { etablissement: { include: { commune: true } } },
+    orderBy: { createdAt: "asc" },
+  });
 
   const aTrianguler = await prisma.ticket.findMany({
     where: { statut: { in: ["répondu", "escaladé"] } },
@@ -37,15 +42,13 @@ export default async function AssociationPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-clairvoie-bleu">File de triangulation</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Rendez un verdict indépendant sur les signalements répondus ou
-          escaladés pour silence de l&apos;établissement.
+      {searchParams.success === "contact_verifie" && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          Coordonnée vérifiée enregistrée : les signalements en attente pour cet établissement
+          reprennent leur cours.
         </p>
-      </div>
-
-      {searchParams.success && (
+      )}
+      {searchParams.success === "verdict_rendu" && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           Verdict enregistré.
         </p>
@@ -55,6 +58,82 @@ export default async function AssociationPage({
           {decodeURIComponent(searchParams.error)}
         </p>
       )}
+
+      <div className="rounded-xl border-2 border-purple-200 bg-purple-50/40 p-5 space-y-4">
+        <div>
+          <h1 className="text-xl font-bold text-purple-900">
+            Vérification de contact requise
+          </h1>
+          <p className="mt-1 text-sm text-purple-800">
+            Les canaux automatisés n&apos;ont pas réussi à délivrer ces signalements à
+            l&apos;établissement. Ce n&apos;est pas un silence de l&apos;établissement — c&apos;est
+            un problème de coordonnées. Retrouvez une coordonnée fonctionnelle (recherche
+            manuelle, appel direct) et soumettez-la une fois qu&apos;elle a fonctionné.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {verificationContactRequise.map((ticket) => (
+            <div key={ticket.id} className="card space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-slate-800">{ticket.categorie}</p>
+                  <p className="text-xs text-slate-500">
+                    {ticket.etablissement.nom} · {ticket.etablissement.commune.nom}
+                  </p>
+                </div>
+                <span className={`badge badge-${ticket.statut}`}>
+                  {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
+                </span>
+              </div>
+              <p className="text-sm text-slate-600">{ticket.contenu}</p>
+              <form
+                action={`/api/signalement/${ticket.id}/proposer-contact`}
+                method="post"
+                className="flex flex-wrap items-center gap-2 border-t border-purple-100 pt-3"
+              >
+                <select name="type" className="input w-auto text-xs" required defaultValue="">
+                  <option value="" disabled>
+                    Type de coordonnée…
+                  </option>
+                  {TYPES_CONTACT.map((t) => (
+                    <option key={t} value={t}>
+                      {LABEL_TYPE_CONTACT[t] ?? t}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="valeur"
+                  className="input w-auto flex-1 text-xs"
+                  placeholder="Coordonnée vérifiée (email, numéro, adresse…)"
+                  required
+                />
+                <input
+                  name="porteur"
+                  className="input w-auto text-xs"
+                  placeholder="Porteur (si téléphone)"
+                />
+                <button type="submit" className="btn btn-primary text-xs">
+                  Confirmer ce contact
+                </button>
+              </form>
+            </div>
+          ))}
+          {verificationContactRequise.length === 0 && (
+            <p className="text-sm text-purple-800/70">
+              Aucun signalement en attente de vérification de contact.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold text-clairvoie-bleu">File de triangulation</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Rendez un verdict indépendant sur les signalements répondus ou
+          escaladés pour silence de l&apos;établissement.
+        </p>
+      </div>
 
       <div className="space-y-4">
         {aTrianguler.map((ticket) => (
@@ -68,7 +147,7 @@ export default async function AssociationPage({
                 </p>
               </div>
               <span className={`badge badge-${ticket.statut}`}>
-                {STATUT_LABELS[ticket.statut] ?? ticket.statut}
+                {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
               </span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
@@ -109,7 +188,7 @@ export default async function AssociationPage({
             <div key={ticket.id} className="card flex items-center justify-between">
               <span className="text-sm text-slate-600">{ticket.categorie}</span>
               <span className={`badge badge-${ticket.statut}`}>
-                {STATUT_LABELS[ticket.statut] ?? ticket.statut}
+                {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
               </span>
             </div>
           ))}

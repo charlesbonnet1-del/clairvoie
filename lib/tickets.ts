@@ -55,12 +55,19 @@ export async function repondreSignalement(params: {
   return updated;
 }
 
-/** Escalade automatiquement (silence de l'établissement) les tickets ouverts
- * depuis plus de RESPONSE_DEADLINE_HOURS sans réponse. Appelé par le cron. */
+/**
+ * Escalade automatiquement (silence de l'établissement) les tickets ouverts
+ * depuis plus de RESPONSE_DEADLINE_HOURS sans réponse. Appelé par le cron.
+ *
+ * Le délai se compte depuis receptionConfirmeeAt, jamais depuis createdAt :
+ * tant qu'aucun canal de contact n'a été confirmé, le ticket ne relève pas
+ * du silence de l'établissement mais du parcours de vérification de contact
+ * (voir lib/contactVerification.ts -> evaluerEchecsGracePeriod).
+ */
 export async function escaladerSiSilence(acteurPseudo = "system:cron") {
   const seuil = new Date(Date.now() - RESPONSE_DEADLINE_HOURS * 60 * 60 * 1000);
   const aEscalader = await prisma.ticket.findMany({
-    where: { statut: "ouvert", createdAt: { lt: seuil } },
+    where: { statut: "ouvert", receptionConfirmeeAt: { not: null, lt: seuil } },
   });
 
   const escalades = [];

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, UnauthorizedError } from "@/lib/auth";
 import { creerSignalement, RegleMetierError } from "@/lib/tickets";
-import { resoudreEtablissement } from "@/lib/etablissements";
-import { CATEGORIES, deriverGraviteDepuisCategorie } from "@/config";
+import { resoudreEtablissement, ajouterContactSecondaireParent } from "@/lib/etablissements";
+import { tenterContactEtablissement } from "@/lib/contactVerification";
+import { CATEGORIES, TYPES_CONTACT, deriverGraviteDepuisCategorie } from "@/config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
     const etablissementAdresse = String(formData.get("etablissementAdresse") ?? "");
     const categorie = String(formData.get("categorie") ?? "");
     const contenu = String(formData.get("contenu") ?? "");
+    const contactSecondaireType = String(formData.get("contactSecondaireType") ?? "");
+    const contactSecondaireValeur = String(formData.get("contactSecondaireValeur") ?? "");
+    const contactSecondairePorteur = String(formData.get("contactSecondairePorteur") ?? "");
 
     if (!communeNom || !etablissementNom || !categorie || !contenu.trim()) {
       return NextResponse.redirect(
@@ -41,13 +45,35 @@ export async function POST(req: NextRequest) {
       etablissementAdresse,
     });
 
-    await creerSignalement({
+    if (
+      contactSecondaireValeur.trim() &&
+      TYPES_CONTACT.includes(contactSecondaireType as (typeof TYPES_CONTACT)[number])
+    ) {
+      await ajouterContactSecondaireParent({
+        etablissementId,
+        type: contactSecondaireType,
+        valeur: contactSecondaireValeur,
+        porteur: contactSecondairePorteur,
+      });
+    }
+
+    const ticket = await creerSignalement({
       parentPseudoId: identity.pseudoId,
       etablissementId,
       categorie,
       contenu,
       gravite: deriverGraviteDepuisCategorie(categorie),
     });
+
+    // Tente automatiquement de délivrer le signalement à l'établissement par
+    // les canaux disponibles. N'échoue jamais silencieusement mais ne
+    // bloque jamais la création du ticket : une erreur ici n'empêche pas le
+    // parent de recevoir la confirmation de dépôt.
+    try {
+      await tenterContactEtablissement(ticket.id);
+    } catch (err) {
+      console.error(`[contact] échec de la tentative de contact pour ${ticket.id} :`, err);
+    }
 
     return NextResponse.redirect(new URL("/parent?success=cree", req.url), { status: 303 });
   } catch (err) {

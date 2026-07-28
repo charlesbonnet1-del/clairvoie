@@ -12,6 +12,12 @@ function hoursAgo(hours: number): Date {
 function hoursFromNow(hours: number): Date {
   return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
+/** Réception confirmée peu après le dépôt — la majorité des établissements
+ * du seed ont des coordonnées qui fonctionnent, la démo veut surtout
+ * illustrer le cas contraire (T16) sans le généraliser. */
+function receptionRapide(createdAt: Date, heuresApres = 2): Date {
+  return new Date(createdAt.getTime() + heuresApres * 60 * 60 * 1000);
+}
 
 async function log(ticketId: string, action: string, acteurPseudo: string) {
   await appendAuditLog({ ticketId, action, acteurPseudo });
@@ -21,7 +27,10 @@ async function main() {
   console.log("Nettoyage de la base…");
   await prisma.auditLog.deleteMany();
   await prisma.suiteJudiciaire.deleteMany();
+  await prisma.tentativeContact.deleteMany();
   await prisma.ticket.deleteMany();
+  await prisma.alerteQualiteDonnees.deleteMany();
+  await prisma.contactCanal.deleteMany();
   await prisma.identity.deleteMany();
   await prisma.etablissement.deleteMany();
   await prisma.commune.deleteMany();
@@ -57,6 +66,45 @@ async function main() {
   });
   const ecoleDesTilleuls = await prisma.etablissement.create({
     data: { nom: "École primaire des Tilleuls", communeId: grande.id },
+  });
+
+  console.log("Création des coordonnées de contact…");
+  // Lycée Victor Hugo : coordonnées fonctionnelles, vérifiées de longue date.
+  await prisma.contactCanal.create({
+    data: {
+      etablissementId: lyceeVictorHugo.id,
+      type: "email",
+      valeur: "ce.0382430K@ac-demo.fr",
+      source: "annuaire_education_nationale",
+      statutVerification: "verifie",
+      derniereReussite: daysAgo(60),
+      derniereTentativeAt: daysAgo(60),
+    },
+  });
+  await prisma.contactCanal.create({
+    data: {
+      etablissementId: lyceeVictorHugo.id,
+      type: "telephone",
+      valeur: "04 74 00 00 00",
+      source: "annuaire_education_nationale",
+      statutVerification: "verifie",
+      derniereReussite: daysAgo(60),
+      derniereTentativeAt: daysAgo(60),
+    },
+  });
+  // École primaire des Tilleuls : email connu mais qui a déjà bronché une
+  // fois — sert de terrain pour la démonstration de la file de
+  // vérification de contact de l'association tierce (voir T16 plus bas).
+  const emailTilleuls = await prisma.contactCanal.create({
+    data: {
+      etablissementId: ecoleDesTilleuls.id,
+      type: "email",
+      valeur: "contact@tilleuls-demo.fr",
+      source: "annuaire_education_nationale",
+      statutVerification: "non_verifie",
+      echecsConsecutifs: 1,
+      derniereTentativeAt: daysAgo(3),
+    },
   });
 
   console.log("Création des comptes de démo…");
@@ -118,6 +166,7 @@ async function main() {
       gravite: "legere",
       statut: "ouvert",
       createdAt: daysAgo(2),
+      receptionConfirmeeAt: receptionRapide(daysAgo(2)),
     },
   });
   await log(t1.id, "creation", p2);
@@ -132,6 +181,7 @@ async function main() {
       gravite: "moderee",
       statut: "répondu",
       createdAt: daysAgo(20),
+      receptionConfirmeeAt: receptionRapide(daysAgo(20)),
       reponduAt: daysAgo(18),
       reponseContenu:
         "Un entretien a été mené avec le membre du personnel concerné et un rappel des règles a été effectué.",
@@ -150,6 +200,7 @@ async function main() {
       gravite: "grave",
       statut: "escaladé",
       createdAt: daysAgo(20),
+      receptionConfirmeeAt: receptionRapide(daysAgo(20)),
       escaladeAt: daysAgo(15),
     },
   });
@@ -168,6 +219,7 @@ async function main() {
       gravite: "legere",
       statut: "clôturé_accord_mutuel",
       createdAt: daysAgo(3),
+      receptionConfirmeeAt: receptionRapide(daysAgo(3)),
       reponduAt: daysAgo(2),
       reponseContenu: "Médiation organisée entre les élèves concernés, situation apaisée.",
       clotureAt: hoursAgo(1),
@@ -188,6 +240,7 @@ async function main() {
       gravite: "moderee",
       statut: "clôturé_accord_mutuel",
       createdAt: daysAgo(20),
+      receptionConfirmeeAt: receptionRapide(daysAgo(20)),
       reponduAt: daysAgo(19),
       reponseContenu: "Renforcement de la surveillance des couloirs mis en place.",
       clotureAt: daysAgo(15),
@@ -208,6 +261,7 @@ async function main() {
       gravite: "grave",
       statut: "trianguléfondé",
       createdAt: daysAgo(25),
+      receptionConfirmeeAt: receptionRapide(daysAgo(25)),
       reponduAt: daysAgo(24),
       reponseContenu: "Le personnel concerné a été suspendu dans l'attente des conclusions.",
       verdict: "fondé",
@@ -230,6 +284,7 @@ async function main() {
       gravite: "legere",
       statut: "ouvert",
       createdAt: daysAgo(1),
+      receptionConfirmeeAt: receptionRapide(daysAgo(1)),
     },
   });
   await log(t7.id, "creation", p3);
@@ -246,6 +301,7 @@ async function main() {
       gravite: "moderee",
       statut: "répondu",
       createdAt: daysAgo(10),
+      receptionConfirmeeAt: receptionRapide(daysAgo(10)),
       reponduAt: daysAgo(9),
       reponseContenu: "Un rappel des obligations déontologiques a été fait à l'enseignant concerné.",
     },
@@ -263,6 +319,7 @@ async function main() {
       gravite: "legere",
       statut: "ouvert",
       createdAt: hoursAgo(12),
+      receptionConfirmeeAt: receptionRapide(hoursAgo(12)),
     },
   });
   await log(t9.id, "creation", p1);
@@ -277,6 +334,7 @@ async function main() {
       gravite: "grave",
       statut: "trianguléinfondé",
       createdAt: daysAgo(30),
+      receptionConfirmeeAt: receptionRapide(daysAgo(30)),
       reponduAt: daysAgo(29),
       reponseContenu: "Enquête interne menée, versions contradictoires recueillies.",
       verdict: "infondé",
@@ -297,6 +355,7 @@ async function main() {
       gravite: "moderee",
       statut: "escaladé",
       createdAt: daysAgo(20),
+      receptionConfirmeeAt: receptionRapide(daysAgo(20)),
       escaladeAt: daysAgo(15),
     },
   });
@@ -313,6 +372,7 @@ async function main() {
       gravite: "legere",
       statut: "clôturé_accord_mutuel",
       createdAt: daysAgo(40),
+      receptionConfirmeeAt: receptionRapide(daysAgo(40)),
       reponduAt: daysAgo(39),
       reponseContenu: "Excuses formelles présentées à la famille.",
       clotureAt: daysAgo(35),
@@ -335,6 +395,7 @@ async function main() {
       gravite: "moderee",
       statut: "ouvert",
       createdAt: daysAgo(6),
+      receptionConfirmeeAt: receptionRapide(daysAgo(6)),
     },
   });
   await log(t13.id, "creation", p4);
@@ -349,6 +410,7 @@ async function main() {
       gravite: "legere",
       statut: "répondu",
       createdAt: daysAgo(8),
+      receptionConfirmeeAt: receptionRapide(daysAgo(8)),
       reponduAt: daysAgo(7),
       reponseContenu: "Un accompagnement pédagogique a été mis en place.",
     },
@@ -366,18 +428,47 @@ async function main() {
       gravite: "grave",
       statut: "ouvert",
       createdAt: hoursAgo(3),
+      receptionConfirmeeAt: receptionRapide(hoursAgo(3)),
     },
   });
   await log(t15.id, "creation", p1);
   await prisma.suiteJudiciaire.create({ data: { ticketId: t15.id, statut: "transmis" } });
   await log(t15.id, "suite_judiciaire_declaree", p1);
 
+  // T16 — le seul canal connu (email) a déjà échoué une fois ; la réception
+  // n'a jamais été confirmée. Démontre la file "Vérification de contact
+  // requise" de l'association tierce, distincte de l'escalade pour silence.
+  const t16 = await prisma.ticket.create({
+    data: {
+      parentPseudoId: p4,
+      etablissementId: ecoleDesTilleuls.id,
+      categorie: "Violence verbale ou psychologique",
+      contenu: "Propos déplacés tenus par un intervenant périscolaire, aucune réponse reçue.",
+      gravite: "moderee",
+      statut: "verification_contact_requise",
+      createdAt: daysAgo(3),
+    },
+  });
+  await log(t16.id, "creation", p4);
+  await prisma.tentativeContact.create({
+    data: {
+      ticketId: t16.id,
+      contactCanalId: emailTilleuls.id,
+      methode: "email",
+      statut: "echec_rebond",
+      timestamp: daysAgo(3),
+    },
+  });
+  await log(t16.id, "verification_contact_requise", "system:cron");
+
   console.log("Exécution de l'escalade automatique (cron) pour les signalements en silence…");
   const escalades = await escaladerSiSilence();
   console.log(`  -> ${escalades.length} signalement(s) escaladé(s) automatiquement.`);
 
   console.log("\nSeed terminé.");
-  console.log("Répartition géographique : Sainte-Colombe=3, Vallonry=4, Grandvillier=8 (total 15).");
+  console.log(
+    "Répartition géographique : Sainte-Colombe=3, Vallonry=4, Grandvillier=9 (total 16)."
+  );
 }
 
 main()

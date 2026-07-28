@@ -1,13 +1,5 @@
 import { computeDashboardStats } from "@/lib/dashboardStats";
-
-const STATUT_LABELS: Record<string, string> = {
-  ouvert: "Ouvert",
-  répondu: "Répondu",
-  escaladé: "Escaladé",
-  trianguléfondé: "Triangulé — fondé",
-  trianguléinfondé: "Triangulé — infondé",
-  clôturé_accord_mutuel: "Clôturé par accord mutuel",
-};
+import { STATUT_TICKET_LABELS } from "@/lib/labels";
 
 const MAILLE_LABELS: Record<string, string> = {
   commune: "Commune",
@@ -85,7 +77,7 @@ export default async function DashboardPage() {
           {Object.entries(stats.global.repartitionStatuts).map(([statut, count]) => (
             <div key={statut} className="flex items-center gap-3">
               <span className="w-40 shrink-0 text-xs text-slate-500">
-                {STATUT_LABELS[statut] ?? statut}
+                {STATUT_TICKET_LABELS[statut] ?? statut}
               </span>
               <div className="h-3 flex-1 rounded-full bg-slate-100">
                 <div

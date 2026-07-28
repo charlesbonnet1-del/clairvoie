@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAnnuaireRecords, AnnuaireIndisponibleError } from "@/lib/annuaireApi";
 
 export const dynamic = "force-dynamic";
-
-interface AnnuaireRecord {
-  identifiant_de_l_etablissement: string;
-  nom_etablissement: string;
-  type_etablissement: string;
-  adresse_1?: string | null;
-  code_postal?: string | null;
-  nom_commune?: string | null;
-}
 
 export interface EtablissementSuggestion {
   uai: string;
@@ -29,26 +21,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ etablissements: [] });
   }
 
-  const url = new URL(
-    "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-annuaire-education/records"
-  );
-  url.searchParams.set(
-    "where",
-    `code_commune="${codeCommune}" AND etat="OUVERT" AND ` +
-      `(type_etablissement="Ecole" OR type_etablissement="Collège" OR type_etablissement="Lycée")`
-  );
-  url.searchParams.set("limit", "100");
-
-  const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!response.ok) {
-    return NextResponse.json(
-      { etablissements: [], error: "annuaire_education_indisponible" },
-      { status: 502 }
+  let records;
+  try {
+    records = await fetchAnnuaireRecords(
+      `code_commune="${codeCommune}" AND etat="OUVERT" AND ` +
+        `(type_etablissement="Ecole" OR type_etablissement="Collège" OR type_etablissement="Lycée")`
     );
+  } catch (err) {
+    if (err instanceof AnnuaireIndisponibleError) {
+      return NextResponse.json(
+        { etablissements: [], error: "annuaire_education_indisponible" },
+        { status: 502 }
+      );
+    }
+    throw err;
   }
 
-  const data = (await response.json()) as { results: AnnuaireRecord[] };
-  const etablissements: EtablissementSuggestion[] = data.results
+  const etablissements: EtablissementSuggestion[] = records
     .map((r) => ({
       uai: r.identifiant_de_l_etablissement,
       nom: r.nom_etablissement,

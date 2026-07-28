@@ -60,7 +60,67 @@ model Etablissement {
   // structure périscolaire absente de cet annuaire (saisie manuelle) ou pour
   // les établissements fictifs du seed de démo.
   uai       String?  @unique
+  // Dernière synchronisation réussie avec l'annuaire de l'éducation
+  // nationale (lib/annuaire.ts) ; null pour les établissements sans UAI ou
+  // jamais synchronisés (seed de démo).
+  derniereSyncAnnuaire DateTime?
   tickets   Ticket[]
+  contacts  ContactCanal[]
+  alertesQualiteDonnees AlerteQualiteDonnees[]
+}
+
+// ---------------------------------------------------------------------------
+// Coordonnées de contact d'un établissement — annuaire qui s'enrichit dans
+// le temps. La saisie du parent n'en est jamais la source principale : elle
+// n'ajoute que des canaux secondaires (source = "propose_par_parent"),
+// jamais automatiquement considérés "verifie". Seule une tentative de
+// contact réelle ayant abouti (livrée ou ouverte) fait passer
+// statutVerification à "verifie" — voir lib/contactVerification.ts.
+// ---------------------------------------------------------------------------
+model ContactCanal {
+  id                 String    @id @default(cuid())
+  etablissementId    String
+  etablissement      Etablissement @relation(fields: [etablissementId], references: [id])
+  type               String    // "email" | "telephone" | "courrier_recommande_electronique" | "adresse_postale"
+  valeur             String
+  // Pour un téléphone proposé par un parent : qui détient ce numéro
+  // (ex. "Directeur", "Secrétariat"). Sans objet pour les autres types.
+  porteur            String?
+  source             String    // "annuaire_education_nationale" | "propose_par_parent" | "confirme_etablissement"
+  statutVerification String    @default("non_verifie") // "non_verifie" | "verifie"
+  derniereReussite   DateTime?
+  derniereTentativeAt DateTime?
+  echecsConsecutifs  Int       @default(0)
+  createdAt          DateTime  @default(now())
+  tentatives         TentativeContact[]
+}
+
+// ---------------------------------------------------------------------------
+// Historique des tentatives de contact automatisées pour un ticket donné.
+// ---------------------------------------------------------------------------
+model TentativeContact {
+  id             String   @id @default(cuid())
+  ticketId       String
+  ticket         Ticket   @relation(fields: [ticketId], references: [id])
+  contactCanalId String
+  contactCanal   ContactCanal @relation(fields: [contactCanalId], references: [id])
+  methode        String   // "email" | "sms" | "recommande_electronique"
+  statut         String   // "envoye" | "livre" | "ouvert" | "echec_rebond" | "sans_reponse"
+  timestamp      DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Alerte interne (jamais publique) signalant des coordonnées d'établissement
+// probablement obsolètes — destinée à la collectivité cliente, distincte des
+// statistiques publiques de délai.
+// ---------------------------------------------------------------------------
+model AlerteQualiteDonnees {
+  id              String   @id @default(cuid())
+  etablissementId String
+  etablissement   Etablissement @relation(fields: [etablissementId], references: [id])
+  message         String
+  createdAt       DateTime @default(now())
+  resolue         Boolean  @default(false)
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +138,14 @@ model Ticket {
   // dérivée automatiquement de `categorie` (config.ts -> CATEGORIE_GRAVITE).
   gravite         String
   statut          String   @default("ouvert")
-  // "ouvert" | "répondu" | "escaladé" | "trianguléfondé" | "trianguléinfondé" | "clôturé_accord_mutuel"
+  // "ouvert" | "verification_contact_requise" | "répondu" | "escaladé" |
+  // "trianguléfondé" | "trianguléinfondé" | "clôturé_accord_mutuel"
+
+  // Horodatage de la première tentative de contact automatisée ayant
+  // effectivement abouti (livrée ou ouverte) — jamais le dépôt lui-même.
+  // C'est ce champ, pas createdAt, qui alimente le délai officiel utilisé
+  // par l'escalade automatique et les statistiques publiques.
+  receptionConfirmeeAt DateTime?
 
   reponseContenu  String?
   reponduAt       DateTime?
@@ -95,6 +162,7 @@ model Ticket {
 
   auditLogs         AuditLog[]
   suitesJudiciaires SuiteJudiciaire[]
+  tentativesContact TentativeContact[]
 }
 
 // ---------------------------------------------------------------------------

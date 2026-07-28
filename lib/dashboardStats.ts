@@ -37,9 +37,13 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
 
   const total = tickets.length;
 
-  const repondus = tickets.filter((t) => t.reponduAt);
+  // Le délai "officiel" se compte depuis la réception confirmée
+  // (receptionConfirmeeAt), jamais depuis le dépôt (createdAt) : tant
+  // qu'aucun canal de contact n'a abouti, l'établissement n'est
+  // responsable de rien (voir lib/contactVerification.ts).
+  const repondus = tickets.filter((t) => t.reponduAt && t.receptionConfirmeeAt);
   const delaisReponseHeures = repondus.map(
-    (t) => (t.reponduAt!.getTime() - t.createdAt.getTime()) / (1000 * 60 * 60)
+    (t) => (t.reponduAt!.getTime() - t.receptionConfirmeeAt!.getTime()) / (1000 * 60 * 60)
   );
   const delaiMoyenReponseHeures =
     delaisReponseHeures.length > 0
@@ -58,7 +62,12 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
   const escalades = tickets.filter((t) => t.escaladeAt);
   const tauxEscalade = total > 0 ? escalades.length / total : null;
 
-  const traites = tickets.filter((t) => t.statut !== "ouvert");
+  // "ouvert" (en attente de réponse) et "verification_contact_requise" (pas
+  // encore délivré à l'établissement) ne sont pas encore des cas traités —
+  // aucun des deux ne doit compter contre l'établissement.
+  const traites = tickets.filter(
+    (t) => t.statut !== "ouvert" && t.statut !== "verification_contact_requise"
+  );
   const traitesDansLesDelais = traites.filter((t) => t.statut !== "escaladé");
   const tauxReponseDansLesDelais =
     traites.length > 0 ? traitesDansLesDelais.length / traites.length : null;

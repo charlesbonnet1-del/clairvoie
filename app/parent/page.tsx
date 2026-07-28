@@ -3,15 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { STATUTS_SUITE_JUDICIAIRE } from "@/config";
-
-const STATUT_LABELS: Record<string, string> = {
-  ouvert: "Ouvert",
-  répondu: "Répondu",
-  escaladé: "Escaladé",
-  trianguléfondé: "Triangulé — fondé",
-  trianguléinfondé: "Triangulé — infondé",
-  clôturé_accord_mutuel: "Clôturé par accord mutuel",
-};
+import { STATUT_TICKET_LABELS } from "@/lib/labels";
 
 export default async function ParentPage({
   searchParams,
@@ -74,7 +66,7 @@ export default async function ParentPage({
                   </p>
                 </div>
                 <span className={`badge badge-${ticket.statut}`}>
-                  {STATUT_LABELS[ticket.statut] ?? ticket.statut}
+                  {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
                 </span>
               </div>
               <p className="text-sm text-slate-600">{ticket.contenu}</p>

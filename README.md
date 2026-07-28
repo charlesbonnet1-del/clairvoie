@@ -116,25 +116,77 @@ violences physiques ou sexuelles sont classées `grave` par construction, ce
 qui déclenche le principe 8 (clôture par accord mutuel impossible sans
 validation de l'association tierce).
 
+Le parent peut aussi proposer un **moyen de contact secondaire** pour
+l'établissement (email, téléphone avec son porteur, adresse postale). Ce
+n'est jamais la source principale des coordonnées : le canal créé est
+marqué `source = "propose_par_parent"` et `statutVerification =
+"non_verifie"` jusqu'à ce qu'une tentative de contact réelle aboutisse.
+
+## Coordonnées d'établissement vérifiées et accusé de réception
+
+Le **délai officiel** utilisé par l'escalade automatique et les
+statistiques publiques ne démarre jamais au dépôt du signalement : il
+démarre à la **réception confirmée**, c'est-à-dire la première fois qu'un
+canal de contact délivre effectivement le signalement à l'établissement.
+
+- **Annuaire de coordonnées qui s'enrichit dans le temps**
+  (`lib/annuaire.ts`) : à la sélection d'un établissement (ou dès qu'un
+  ticket cible un UAI inconnu), ses coordonnées (email, téléphone) sont
+  synchronisées depuis l'annuaire de l'éducation nationale — la même
+  intégration que pour la recherche d'établissement, jamais un import CSV
+  ou un snapshot statique. Rafraîchi tous les `ANNUAIRE_REFRESH_DAYS` (30
+  par défaut) ; si l'API est indisponible, retombe sur le cache local et
+  journalise l'échec sans jamais bloquer la création d'un ticket.
+- **Une coordonnée fraîchement synchronisée reste `non_verifie`** : l'annuaire
+  donne une donnée déclarative à jour, pas la preuve qu'un canal fonctionne
+  aujourd'hui. Seule une tentative de contact réelle ayant abouti (livrée ou
+  ouverte) fait passer un canal à `verifie` (`lib/contactVerification.ts`).
+- **Tentative automatique à la création du ticket**, par ordre de fiabilité
+  décroissant : recommandé électronique > email > SMS (fonctions de
+  transport mockées pour la démo — `# TODO: intégration réelle` dans
+  `lib/contactVerification.ts`, ex. SendGrid ou un fournisseur SMS).
+- **Si tous les canaux échouent** au-delà du délai de grâce
+  (`CONTACT_GRACE_PERIOD_HOURS`, 48h), le ticket passe au statut
+  `verification_contact_requise` — distinct de `escaladé` : ce n'est pas un
+  silence de l'établissement, c'est un problème de canal. L'association
+  tierce retrouve alors une coordonnée fonctionnelle et la soumet via
+  `proposerContactVerifie`, ce qui débloque aussitôt le ticket.
+- **Alerte qualité de données interne** (jamais publique) quand un
+  établissement cumule `ALERTE_QUALITE_SEUIL_ECHECS` échecs (3 par défaut)
+  sur une fenêtre de `ALERTE_QUALITE_FENETRE_JOURS` (90 jours) — table
+  `AlerteQualiteDonnees`, distincte des statistiques publiques de délai.
+
+Vérifié par `tests/test_delai_demarre_a_reception_confirmee.test.ts`,
+`tests/test_echec_tous_canaux_transmet_association.test.ts`,
+`tests/test_contact_verifie_persiste_etablissement.test.ts`,
+`tests/test_alerte_qualite_donnees.test.ts`,
+`tests/test_api_annuaire_fallback_cache.test.ts` et
+`tests/test_coordonnee_api_reste_non_verifiee.test.ts`.
+
 ## Jeu de données de démonstration
 
 Le seed (`prisma/seed.ts`) génère :
 
 - 3 communes fictives de tailles différentes : **Sainte-Colombe** (3
   signalements — volontairement sous `K_ANONYMITY_THRESHOLD`, 8 par défaut),
-  **Vallonry** (4 signalements) et **Grandvillier** (8 signalements, répartis
+  **Vallonry** (4 signalements) et **Grandvillier** (9 signalements, répartis
   sur 2 établissements).
-- 15 signalements aux statuts variés : ouvert, répondu dans les délais,
-  escaladé pour silence (dont un escaladé automatiquement par le job de
-  cron au moment du seed), triangulé (fondé / infondé), clôturé par accord
-  mutuel (encore révocable ou non), avec ou sans suite judiciaire déclarée.
+- 16 signalements aux statuts variés : ouvert, en attente de vérification de
+  contact, répondu dans les délais, escaladé pour silence (dont un escaladé
+  automatiquement par le job de cron au moment du seed), triangulé (fondé /
+  infondé), clôturé par accord mutuel (encore révocable ou non), avec ou
+  sans suite judiciaire déclarée.
 - 4 comptes de démonstration, un par rôle métier.
+- Des coordonnées de contact d'établissement (email, téléphone) pré-vérifiées
+  pour la démo, et un établissement dont le seul canal connu a déjà échoué
+  une fois, pour illustrer la file « Vérification de contact requise » de
+  l'association tierce.
 
 Sur le tableau de bord public, vous pouvez observer la granularité dynamique
 en action : Sainte-Colombe et Vallonry (respectivement sous le seuil à
 l'échelle de la commune et de leur EPCI) remontent jusqu'au département,
-tandis que Grandvillier (8 cas, au seuil) s'affiche directement à l'échelle
-de la commune.
+tandis que Grandvillier (9 cas, au-dessus du seuil) s'affiche directement à
+l'échelle de la commune.
 
 ## Principes non négociables — vérifiés par des tests
 

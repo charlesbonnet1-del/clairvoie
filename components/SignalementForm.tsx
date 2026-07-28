@@ -7,6 +7,12 @@ import type { EtablissementSuggestion } from "@/app/api/geo/etablissements/route
 
 const AUTRE_ETABLISSEMENT = "__autre__";
 
+const TYPES_CONTACT_SECONDAIRE = [
+  { value: "email", label: "Email" },
+  { value: "telephone", label: "Téléphone" },
+  { value: "adresse_postale", label: "Adresse postale" },
+] as const;
+
 export default function SignalementForm() {
   const [communeQuery, setCommuneQuery] = useState("");
   const [communeSuggestions, setCommuneSuggestions] = useState<CommuneSuggestion[]>([]);
@@ -17,6 +23,11 @@ export default function SignalementForm() {
   const [loadingEtablissements, setLoadingEtablissements] = useState(false);
   const [etablissementChoice, setEtablissementChoice] = useState("");
   const [etablissementManuelNom, setEtablissementManuelNom] = useState("");
+
+  const [contactSecondaireOuvert, setContactSecondaireOuvert] = useState(false);
+  const [contactSecondaireType, setContactSecondaireType] = useState<string>("email");
+  const [contactSecondaireValeur, setContactSecondaireValeur] = useState("");
+  const [contactSecondairePorteur, setContactSecondairePorteur] = useState("");
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -110,6 +121,21 @@ export default function SignalementForm() {
         name="etablissementAdresse"
         value={etablissementChoice === AUTRE_ETABLISSEMENT ? "" : etablissementSelectionne?.adresse ?? ""}
       />
+      <input
+        type="hidden"
+        name="contactSecondaireType"
+        value={contactSecondaireOuvert ? contactSecondaireType : ""}
+      />
+      <input
+        type="hidden"
+        name="contactSecondaireValeur"
+        value={contactSecondaireOuvert ? contactSecondaireValeur : ""}
+      />
+      <input
+        type="hidden"
+        name="contactSecondairePorteur"
+        value={contactSecondaireOuvert ? contactSecondairePorteur : ""}
+      />
 
       <div className="relative">
         <label className="label" htmlFor="commune">
@@ -187,6 +213,75 @@ export default function SignalementForm() {
               onChange={(e) => setEtablissementManuelNom(e.target.value)}
               required
             />
+          )}
+        </div>
+      )}
+
+      {etablissementChoice && (
+        <div className="rounded-lg border border-dashed border-slate-300 p-3">
+          {!contactSecondaireOuvert ? (
+            <button
+              type="button"
+              className="text-xs text-clairvoie-bleuclair underline"
+              onClick={() => setContactSecondaireOuvert(true)}
+            >
+              Vous connaissez un autre moyen de contacter cet établissement ? (optionnel)
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-slate-600">
+                  Moyen de contact secondaire (optionnel)
+                </p>
+                <button
+                  type="button"
+                  className="text-xs text-slate-400 underline"
+                  onClick={() => {
+                    setContactSecondaireOuvert(false);
+                    setContactSecondaireValeur("");
+                    setContactSecondairePorteur("");
+                  }}
+                >
+                  Annuler
+                </button>
+              </div>
+              <p className="text-xs text-slate-400">
+                Cette information vient en complément des coordonnées officielles — elle ne
+                sera considérée fiable qu&apos;une fois qu&apos;un contact réel aura réellement
+                abouti.
+              </p>
+              <select
+                className="input"
+                value={contactSecondaireType}
+                onChange={(e) => setContactSecondaireType(e.target.value)}
+              >
+                {TYPES_CONTACT_SECONDAIRE.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input"
+                placeholder={
+                  contactSecondaireType === "email"
+                    ? "adresse@exemple.fr"
+                    : contactSecondaireType === "telephone"
+                      ? "Numéro de téléphone"
+                      : "Adresse postale"
+                }
+                value={contactSecondaireValeur}
+                onChange={(e) => setContactSecondaireValeur(e.target.value)}
+              />
+              {contactSecondaireType === "telephone" && (
+                <input
+                  className="input"
+                  placeholder="Qui détient ce numéro ? (ex. Directeur, Secrétariat)"
+                  value={contactSecondairePorteur}
+                  onChange={(e) => setContactSecondairePorteur(e.target.value)}
+                />
+              )}
+            </div>
           )}
         </div>
       )}

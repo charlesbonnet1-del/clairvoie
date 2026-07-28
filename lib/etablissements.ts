@@ -1,17 +1,22 @@
 import { prisma } from "./prisma";
 import { RegleMetierError } from "./tickets";
+import { syncEtablissementDepuisAnnuaire } from "./annuaire";
 
 /**
- * Résout l'établissement choisi dans le formulaire de signalement (issu de
- * la recherche publique commune -> établissement, ou d'une saisie manuelle
- * pour une structure périscolaire non référencée par l'annuaire de
- * l'éducation) en un `etablissementId` interne, créant au passage la
- * Commune et/ou l'Établissement s'ils n'existent pas encore.
+ * Résout l'établissement choisi dans le formulaire de signalement en un
+ * `etablissementId` interne.
  *
- * `codeInsee` (Commune) et `uai` (Etablissement) servent de clé d'upsert
- * quand ils sont fournis (recherche via l'API publique) ; à défaut (saisie
- * manuelle), on déduplique par nom + commune plutôt que de créer une
- * nouvelle ligne à chaque signalement.
+ * Quand un UAI est fourni (établissement choisi dans la recherche publique),
+ * on délègue entièrement à syncEtablissementDepuisAnnuaire : le nom, la
+ * commune et les coordonnées de contact viennent de l'annuaire officiel
+ * interrogé côté serveur, jamais des champs cachés soumis par le
+ * navigateur — la saisie du parent n'est jamais la source de vérité des
+ * coordonnées d'établissement.
+ *
+ * À défaut d'UAI (structure périscolaire absente de cet annuaire, saisie
+ * manuelle), on upserte Commune (par code INSEE) et on déduplique
+ * l'Établissement par nom + commune plutôt que d'en créer un nouveau à
+ * chaque signalement.
  */
 export async function resoudreEtablissement(params: {
   communeCodeInsee: string;
@@ -29,6 +34,11 @@ export async function resoudreEtablissement(params: {
     throw new RegleMetierError("Établissement invalide.");
   }
 
+  if (params.etablissementUai.trim()) {
+    const etablissement = await syncEtablissementDepuisAnnuaire(params.etablissementUai.trim());
+    return etablissement.id;
+  }
+
   const commune = await prisma.commune.upsert({
     where: { codeInsee: params.communeCodeInsee },
     update: {},
@@ -40,20 +50,6 @@ export async function resoudreEtablissement(params: {
     },
   });
 
-  if (params.etablissementUai.trim()) {
-    const etablissement = await prisma.etablissement.upsert({
-      where: { uai: params.etablissementUai },
-      update: {},
-      create: {
-        nom: params.etablissementNom,
-        adresse: params.etablissementAdresse || null,
-        communeId: commune.id,
-        uai: params.etablissementUai,
-      },
-    });
-    return etablissement.id;
-  }
-
   const nomManuel = params.etablissementNom.trim();
   const existant = await prisma.etablissement.findFirst({
     where: { nom: nomManuel, communeId: commune.id, uai: null },
@@ -64,4 +60,31 @@ export async function resoudreEtablissement(params: {
     data: { nom: nomManuel, communeId: commune.id },
   });
   return cree.id;
+}
+
+/**
+ * Un parent peut proposer un moyen de contact secondaire pour
+ * l'établissement (email, téléphone avec son porteur, adresse postale).
+ * Ce n'est jamais la source principale des coordonnées : le canal créé
+ * reste `source = "propose_par_parent"` et `statutVerification =
+ * "non_verifie"` jusqu'à ce qu'une tentative de contact réelle aboutisse.
+ */
+export async function ajouterContactSecondaireParent(params: {
+  etablissementId: string;
+  type: string;
+  valeur: string;
+  porteur?: string;
+}): Promise<void> {
+  if (!params.valeur.trim()) return;
+
+  await prisma.contactCanal.create({
+    data: {
+      etablissementId: params.etablissementId,
+      type: params.type,
+      valeur: params.valeur.trim(),
+      porteur: params.porteur?.trim() || null,
+      source: "propose_par_parent",
+      statutVerification: "non_verifie",
+    },
+  });
 }

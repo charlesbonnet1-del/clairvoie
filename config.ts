@@ -11,8 +11,68 @@ export const K_ANONYMITY_THRESHOLD = 8;
 /** Durée pendant laquelle une clôture par accord mutuel reste révocable par le parent. */
 export const RETRACTION_WINDOW_HOURS = 48;
 
-/** Délai laissé à un établissement pour répondre avant escalade automatique au rectorat. */
+/** Délai laissé à un établissement pour répondre avant escalade automatique au
+ * rectorat. Ce délai démarre à la réception confirmée du signalement
+ * (Ticket.receptionConfirmeeAt), jamais au dépôt (Ticket.createdAt) — voir
+ * lib/contactVerification.ts. */
 export const RESPONSE_DEADLINE_HOURS = 120;
+
+/** Durée de fraîcheur du cache local des coordonnées d'établissement avant
+ * un nouveau rafraîchissement depuis l'annuaire de l'éducation nationale. */
+export const ANNUAIRE_REFRESH_DAYS = 30;
+
+/** Délai de grâce laissé aux canaux de contact automatisés avant de
+ * considérer que la réception n'a pas pu être confirmée et de transmettre
+ * à l'association tierce (statut "verification_contact_requise"). */
+export const CONTACT_GRACE_PERIOD_HOURS = 48;
+
+/** Fenêtre glissante sur laquelle les échecs de contact d'un établissement
+ * sont cumulés avant de déclencher une alerte qualité de données interne. */
+export const ALERTE_QUALITE_FENETRE_JOURS = 90;
+
+/** Nombre d'échecs cumulés (tous canaux confondus) dans la fenêtre ci-dessus
+ * déclenchant l'alerte qualité de données. */
+export const ALERTE_QUALITE_SEUIL_ECHECS = 3;
+
+/** Types de canal de contact valides pour un établissement. */
+export const TYPES_CONTACT = [
+  "email",
+  "telephone",
+  "courrier_recommande_electronique",
+  "adresse_postale",
+] as const;
+export type TypeContact = (typeof TYPES_CONTACT)[number];
+
+/** Provenance d'une coordonnée de contact. */
+export const SOURCES_CONTACT = [
+  "annuaire_education_nationale",
+  "propose_par_parent",
+  "confirme_etablissement",
+] as const;
+export type SourceContact = (typeof SOURCES_CONTACT)[number];
+
+/** Statut de vérification d'un canal de contact : "verifie" signifie qu'une
+ * tentative de contact réelle a effectivement abouti (livrée ou ouverte),
+ * jamais qu'une coordonnée provient d'une source réputée fiable. */
+export const STATUTS_VERIFICATION_CONTACT = ["non_verifie", "verifie"] as const;
+export type StatutVerificationContact = (typeof STATUTS_VERIFICATION_CONTACT)[number];
+
+/** Ordre de tentative des canaux automatisés, du plus fiable au moins fiable. */
+export const ORDRE_FIABILITE_CANAUX = [
+  "courrier_recommande_electronique",
+  "email",
+  "telephone",
+] as const satisfies readonly TypeContact[];
+
+/** Statuts possibles d'une tentative de contact individuelle. */
+export const STATUTS_TENTATIVE_CONTACT = [
+  "envoye",
+  "livre",
+  "ouvert",
+  "echec_rebond",
+  "sans_reponse",
+] as const;
+export type StatutTentativeContact = (typeof STATUTS_TENTATIVE_CONTACT)[number];
 
 /** Nom du cookie de session (démo — signature HMAC simple, pas de JWT tiers). */
 export const SESSION_COOKIE_NAME = "clairvoie_session";
@@ -68,9 +128,12 @@ export function deriverGraviteDepuisCategorie(categorie: string): Gravite {
   return CATEGORIE_GRAVITE[categorie as Categorie] ?? "moderee";
 }
 
-/** Statuts valides pour un ticket. */
+/** Statuts valides pour un ticket. "verification_contact_requise" est
+ * distinct de "escaladé" : ce n'est pas un silence de l'établissement, c'est
+ * l'impossibilité de lui délivrer le signalement par un canal vérifié. */
 export const STATUTS_TICKET = [
   "ouvert",
+  "verification_contact_requise",
   "répondu",
   "escaladé",
   "trianguléfondé",
