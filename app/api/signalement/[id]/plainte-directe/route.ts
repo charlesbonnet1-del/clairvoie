@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, UnauthorizedError } from "@/lib/auth";
-import { declarerSuiteJudiciaire, RegleMetierError } from "@/lib/tickets";
-import { STATUTS_SUITE_JUDICIAIRE } from "@/config";
+import { declarerPlainteDirecte, RegleMetierError } from "@/lib/tickets";
 
 export async function POST(
   req: NextRequest,
@@ -10,33 +9,31 @@ export async function POST(
   try {
     const identity = await requireRole("PARENT");
     const formData = await req.formData();
-    const statut = String(formData.get("statut") ?? "");
+    const plainteDeposee = String(formData.get("plainteDeposee") ?? "non") === "oui";
 
-    if (!STATUTS_SUITE_JUDICIAIRE.includes(statut as (typeof STATUTS_SUITE_JUDICIAIRE)[number])) {
+    if (!plainteDeposee) {
       return NextResponse.redirect(
-        new URL("/parent?error=statut_judiciaire_invalide", req.url),
+        new URL("/parent?success=plainte_non_declaree", req.url),
         { status: 303 }
       );
     }
 
-    // Téléversement optionnel d'un document justificatif (ex. courrier de
-    // classement sans suite) : capture par document plutôt que déclaration
-    // libre, pour plus de fiabilité. Aucun stockage réel dans ce MVP (mock,
-    // comme les autres intégrations externes du projet) — seul le nom du
-    // fichier est retenu comme référence.
+    // Téléversement optionnel du récépissé de dépôt de plainte : capture par
+    // document plutôt que déclaration libre, pour plus de fiabilité. Aucun
+    // stockage réel dans ce MVP (mock) — seul le nom du fichier est retenu
+    // comme référence.
     // TODO: intégration réelle (stockage documentaire sécurisé)
-    const document = formData.get("documentJustificatif");
-    const documentRef = document instanceof File && document.size > 0 ? document.name : null;
+    const recepisse = formData.get("recepisse");
+    const documentRef = recepisse instanceof File && recepisse.size > 0 ? recepisse.name : null;
 
-    await declarerSuiteJudiciaire({
+    await declarerPlainteDirecte({
       ticketId: params.id,
       acteurPseudo: identity.pseudoId,
-      statut,
       documentRef,
     });
 
     return NextResponse.redirect(
-      new URL("/parent?success=suite_judiciaire_declaree", req.url),
+      new URL("/parent?success=plainte_directe_declaree", req.url),
       { status: 303 }
     );
   } catch (err) {

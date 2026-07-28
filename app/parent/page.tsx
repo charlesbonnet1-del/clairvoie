@@ -65,6 +65,9 @@ export default async function ParentPage({
           const peutCloturer =
             ticket.gravite !== "grave" &&
             ["ouvert", "répondu"].includes(ticket.statut);
+          const plainteDirecteDeclaree = ticket.suitesJudiciaires.find(
+            (s) => s.origine === "plainte_directe_parent" || s.origine === "les_deux"
+          );
 
           return (
             <div key={ticket.id} className="card space-y-3">
@@ -121,7 +124,8 @@ export default async function ParentPage({
                 <form
                   action={`/api/signalement/${ticket.id}/suite-judiciaire`}
                   method="post"
-                  className="flex items-center gap-2"
+                  encType="multipart/form-data"
+                  className="flex flex-wrap items-center gap-2"
                 >
                   <select name="statut" className="input w-auto text-xs" required>
                     <option value="">Déclarer une suite judiciaire…</option>
@@ -131,19 +135,72 @@ export default async function ParentPage({
                       </option>
                     ))}
                   </select>
+                  <input
+                    type="file"
+                    name="documentJustificatif"
+                    className="text-xs"
+                    aria-label="Document justificatif (optionnel, ex. courrier de classement sans suite)"
+                  />
                   <button type="submit" className="btn btn-secondary text-xs">
                     Déclarer
                   </button>
                 </form>
               </div>
 
+              <div className="border-t border-slate-100 pt-3">
+                {plainteDirecteDeclaree ? (
+                  <p className="text-xs text-slate-500">
+                    Vous avez indiqué avoir déposé plainte directement auprès de la
+                    police/gendarmerie (auto-déclaratif, non vérifié).
+                  </p>
+                ) : (
+                  <form
+                    action={`/api/signalement/${ticket.id}/plainte-directe`}
+                    method="post"
+                    encType="multipart/form-data"
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <label className="text-xs text-slate-600">
+                      J&apos;ai déposé plainte directement auprès de la police/gendarmerie :
+                    </label>
+                    <select
+                      name="plainteDeposee"
+                      className="input w-auto text-xs"
+                      required
+                      defaultValue="non"
+                    >
+                      <option value="non">Non</option>
+                      <option value="oui">Oui</option>
+                    </select>
+                    <input
+                      type="file"
+                      name="recepisse"
+                      className="text-xs"
+                      aria-label="Récépissé de dépôt de plainte (optionnel)"
+                    />
+                    <button type="submit" className="btn btn-secondary text-xs">
+                      Enregistrer
+                    </button>
+                  </form>
+                )}
+              </div>
+
               {ticket.suitesJudiciaires.length > 0 && (
-                <div className="text-xs text-slate-500">
-                  Suites déclarées :{" "}
-                  {ticket.suitesJudiciaires
-                    .map((s) => s.statut.replaceAll("_", " "))
-                    .join(", ")}{" "}
-                  (auto-déclaratif, non vérifié)
+                <div className="space-y-1 text-xs text-slate-500">
+                  <p className="font-medium text-slate-600">
+                    Suites déclarées (auto-déclaratif, non vérifié) :
+                  </p>
+                  <ul className="list-disc pl-4">
+                    {ticket.suitesJudiciaires.map((s) => (
+                      <li key={s.id}>
+                        {s.statut.replaceAll("_", " ")}
+                        {s.origine === "plainte_directe_parent" || s.origine === "les_deux"
+                          ? " · plainte déposée directement par la famille"
+                          : ""}
+                        {s.documentRef ? ` · document : ${s.documentRef}` : ""}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>

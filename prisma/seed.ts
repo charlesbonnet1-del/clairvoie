@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { hashPassword } from "../lib/password";
 import { appendAuditLog } from "../lib/hashchain";
-import { escaladerSiSilence } from "../lib/tickets";
+import { escaladerSiSilence, declarerPlainteDirecte } from "../lib/tickets";
 import { enregistrerPersonneMiseEnCause } from "../lib/personneMiseEnCause";
 
 function daysAgo(days: number, hours = 0): Date {
@@ -280,6 +280,14 @@ async function main() {
   await log(t6.id, "verdict_fondé", "asso-demo-1");
   await prisma.suiteJudiciaire.create({ data: { ticketId: t6.id, statut: "transmis" } });
   await log(t6.id, "suite_judiciaire_declaree", p2);
+  // Démo de la double origine : le parent a aussi déposé plainte directement
+  // auprès de la gendarmerie — la déclaration met à jour l'enregistrement
+  // existant (origine "les_deux") plutôt que d'en créer un second.
+  await declarerPlainteDirecte({
+    ticketId: t6.id,
+    acteurPseudo: p2,
+    documentRef: "recepisse-plainte-gendarmerie.pdf",
+  });
   await enregistrerPersonneMiseEnCause({
     ticketId: t6.id,
     nom: "Surveillant non identifié nommément par le parent",

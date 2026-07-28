@@ -189,16 +189,83 @@ export async function declarerSuiteJudiciaire(params: {
   ticketId: string;
   acteurPseudo: string;
   statut: string;
+  documentRef?: string | null;
 }) {
   const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
   if (!ticket) throw new RegleMetierError("Signalement introuvable.");
 
+  // origine par défaut ("transmission_etablissement", cf. schema.prisma) :
+  // ce parcours générique préexiste à la distinction des deux origines et
+  // reste rattaché à la voie établissement -> rectorat.
   const suite = await prisma.suiteJudiciaire.create({
-    data: { ticketId: params.ticketId, statut: params.statut },
+    data: {
+      ticketId: params.ticketId,
+      statut: params.statut,
+      documentRef: params.documentRef ?? null,
+    },
   });
   await appendAuditLog({
     ticketId: params.ticketId,
     action: "suite_judiciaire_declaree",
+    acteurPseudo: params.acteurPseudo,
+  });
+  return suite;
+}
+
+/**
+ * Déclaration par le parent d'une plainte déposée directement auprès de la
+ * police/gendarmerie — indépendante du statut d'escalade établissement ->
+ * rectorat du ticket. Si une SuiteJudiciaire existe déjà pour ce ticket avec
+ * origine "transmission_etablissement", elle est mise à jour vers
+ * "les_deux" plutôt que de créer un second enregistrement ; une déclaration
+ * répétée est elle aussi idempotente (aucun doublon).
+ */
+export async function declarerPlainteDirecte(params: {
+  ticketId: string;
+  acteurPseudo: string;
+  documentRef?: string | null;
+}) {
+  const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
+  if (!ticket) throw new RegleMetierError("Signalement introuvable.");
+
+  const transmissionExistante = await prisma.suiteJudiciaire.findFirst({
+    where: { ticketId: params.ticketId, origine: "transmission_etablissement" },
+    orderBy: { declaredAt: "desc" },
+  });
+
+  let suite;
+  if (transmissionExistante) {
+    suite = await prisma.suiteJudiciaire.update({
+      where: { id: transmissionExistante.id },
+      data: {
+        origine: "les_deux",
+        documentRef: params.documentRef ?? transmissionExistante.documentRef,
+      },
+    });
+  } else {
+    const plainteExistante = await prisma.suiteJudiciaire.findFirst({
+      where: { ticketId: params.ticketId, origine: { in: ["plainte_directe_parent", "les_deux"] } },
+      orderBy: { declaredAt: "desc" },
+    });
+
+    suite = plainteExistante
+      ? await prisma.suiteJudiciaire.update({
+          where: { id: plainteExistante.id },
+          data: { documentRef: params.documentRef ?? plainteExistante.documentRef },
+        })
+      : await prisma.suiteJudiciaire.create({
+          data: {
+            ticketId: params.ticketId,
+            origine: "plainte_directe_parent",
+            statut: "transmis",
+            documentRef: params.documentRef ?? null,
+          },
+        });
+  }
+
+  await appendAuditLog({
+    ticketId: params.ticketId,
+    action: "plainte_directe_declaree",
     acteurPseudo: params.acteurPseudo,
   });
   return suite;

@@ -155,3 +155,14 @@ export const STATUTS_SUITE_JUDICIAIRE = [
   "sans_nouvelle",
 ] as const;
 export type StatutSuiteJudiciaire = (typeof STATUTS_SUITE_JUDICIAIRE)[number];
+
+/** Origine d'une suite judiciaire déclarée : la plainte directe du parent et
+ * l'escalade établissement -> rectorat sont deux voies de saisine
+ * indépendantes, qui peuvent coexister ("les_deux") sans jamais donner lieu
+ * à un doublon d'enregistrement pour un même ticket. */
+export const ORIGINES_SUITE_JUDICIAIRE = [
+  "plainte_directe_parent",
+  "transmission_etablissement",
+  "les_deux",
+] as const;
+export type OrigineSuiteJudiciaire = (typeof ORIGINES_SUITE_JUDICIAIRE)[number];

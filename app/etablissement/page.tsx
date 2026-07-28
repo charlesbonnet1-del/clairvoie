@@ -38,6 +38,7 @@ export default async function EtablissementPage({
   // pas le cas, il ne peut pas, de fait, en avoir connaissance.
   const tickets = await prisma.ticket.findMany({
     where: { etablissementId: identity.etablissementId, receptionConfirmeeAt: { not: null } },
+    include: { suitesJudiciaires: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -82,6 +83,16 @@ export default async function EtablissementPage({
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
             <DateFaitsLigne ticket={ticket} />
+
+            {ticket.suitesJudiciaires.some(
+              (s) => s.origine === "plainte_directe_parent" || s.origine === "les_deux"
+            ) && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Une plainte a été déposée directement par la famille — le
+                signalement peut faire l&apos;objet d&apos;une enquête judiciaire
+                en parallèle.
+              </p>
+            )}
 
             <PersonneMiseEnCauseCard personnes={personnesMiseEnCause.get(ticket.id) ?? []} />
 

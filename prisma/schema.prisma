@@ -230,11 +230,26 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 // Suite judiciaire — purement auto-déclarative par le parent, jamais
 // vérifiée, jamais exposée individuellement sur le dashboard public.
+//
+// Deux origines de saisine de la justice, indépendantes l'une de l'autre :
+// une plainte déposée directement par le parent auprès de la police/
+// gendarmerie ("plainte_directe_parent"), et l'escalade établissement ->
+// rectorat déjà instrumentée par ce modèle ("transmission_etablissement").
+// Les deux peuvent coexister pour un même ticket ("les_deux") : dans ce cas
+// un seul enregistrement est mis à jour, jamais un second créé — voir
+// lib/tickets.ts -> declarerPlainteDirecte.
 // ---------------------------------------------------------------------------
 model SuiteJudiciaire {
   id          String   @id @default(cuid())
   ticketId    String
   ticket      Ticket   @relation(fields: [ticketId], references: [id])
+  // "plainte_directe_parent" | "transmission_etablissement" | "les_deux"
+  origine     String   @default("transmission_etablissement")
   statut      String // "transmis" | "classé_sans_suite" | "renvoi_tribunal" | "condamnation" | "sans_nouvelle"
+  // Référence du document justificatif téléversé (récépissé de dépôt de
+  // plainte, courrier de classement sans suite, etc.). Nom de fichier
+  // uniquement pour ce MVP — aucun stockage réel (mock, comme les autres
+  // intégrations externes du projet).
+  documentRef String?
   declaredAt  DateTime @default(now())
 }
