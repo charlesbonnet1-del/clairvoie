@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma db push --accept-data-loss --skip-generate && node scripts/conditional-seed.js && next build",
+    "build:app": "next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",

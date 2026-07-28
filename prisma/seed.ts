@@ -361,7 +361,7 @@ async function main() {
     data: {
       parentPseudoId: p1,
       etablissementId: ecoleDesTilleuls.id,
-      categorie: "Violence physique",
+      categorie: "Attouchements et sévices à caractère sexuel",
       contenu: "Signalement déposé après un incident survenu ce matin, en attente de traitement.",
       gravite: "grave",
       statut: "ouvert",

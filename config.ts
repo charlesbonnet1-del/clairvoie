@@ -36,6 +36,38 @@ export type Role = (typeof ROLES)[number];
 export const GRAVITES = ["legere", "moderee", "grave"] as const;
 export type Gravite = (typeof GRAVITES)[number];
 
+/**
+ * Catégories de signalement proposées au parent. La gravité n'est plus
+ * auto-déclarée par le parent (retrait de l'entrée "gravité perçue") : elle
+ * est dérivée automatiquement de la catégorie choisie, via
+ * CATEGORIE_GRAVITE ci-dessous. Toute catégorie touchant à des violences
+ * sexuelles est classée "grave" par construction, ce qui déclenche le
+ * principe 8 (clôture par accord mutuel impossible, validation de
+ * l'association tierce obligatoire).
+ */
+export const CATEGORIES = [
+  "Violence physique",
+  "Attouchements et sévices à caractère sexuel",
+  "Violence verbale ou psychologique",
+  "Harcèlement entre élèves",
+  "Négligence de surveillance",
+  "Autre",
+] as const;
+export type Categorie = (typeof CATEGORIES)[number];
+
+export const CATEGORIE_GRAVITE: Record<Categorie, Gravite> = {
+  "Violence physique": "grave",
+  "Attouchements et sévices à caractère sexuel": "grave",
+  "Violence verbale ou psychologique": "moderee",
+  "Harcèlement entre élèves": "moderee",
+  "Négligence de surveillance": "legere",
+  Autre: "moderee",
+};
+
+export function deriverGraviteDepuisCategorie(categorie: string): Gravite {
+  return CATEGORIE_GRAVITE[categorie as Categorie] ?? "moderee";
+}
+
 /** Statuts valides pour un ticket. */
 export const STATUTS_TICKET = [
   "ouvert",

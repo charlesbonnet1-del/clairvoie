@@ -42,14 +42,24 @@ model Commune {
   nom            String
   epci           String
   departement    String
+  // Code INSEE (geo.api.gouv.fr) : sert de clé d'upsert quand une commune
+  // est renseignée via la recherche publique plutôt que par le seed de démo
+  // (auquel cas ce champ reste null — communes fictives, pas de code réel).
+  codeInsee      String?         @unique
   etablissements Etablissement[]
 }
 
 model Etablissement {
   id        String   @id @default(cuid())
   nom       String
+  adresse   String?
   communeId String
   commune   Commune  @relation(fields: [communeId], references: [id])
+  // UAI (identifiant officiel, annuaire de l'éducation) : clé d'upsert pour
+  // les établissements renseignés via la recherche publique. Null pour une
+  // structure périscolaire absente de cet annuaire (saisie manuelle) ou pour
+  // les établissements fictifs du seed de démo.
+  uai       String?  @unique
   tickets   Ticket[]
 }
 
@@ -64,7 +74,9 @@ model Ticket {
   etablissement   Etablissement @relation(fields: [etablissementId], references: [id])
   categorie       String
   contenu         String // en clair pour le MVP ; chiffrement par enregistrement en phase 2
-  gravite         String // "legere" | "moderee" | "grave"
+  // "legere" | "moderee" | "grave" — jamais auto-déclarée par le parent,
+  // dérivée automatiquement de `categorie` (config.ts -> CATEGORIE_GRAVITE).
+  gravite         String
   statut          String   @default("ouvert")
   // "ouvert" | "répondu" | "escaladé" | "trianguléfondé" | "trianguléinfondé" | "clôturé_accord_mutuel"
 

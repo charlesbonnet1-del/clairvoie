@@ -87,6 +87,35 @@ L'écran `/login` simule un choix de fournisseur d'identité
 (« FranceConnect (démo) », « EduConnect (démo) ») : il ne s'agit que d'une
 mise en scène visuelle, sans aucun appel réel à un fournisseur d'identité.
 
+## Dépôt de signalement : commune et établissement réels
+
+Le formulaire `/parent/nouveau-signalement` ne fait plus choisir
+l'établissement dans une liste figée : le parent tape le nom de sa commune,
+et l'établissement se pré-remplit à partir de données publiques réelles.
+
+- **Communes** — [geo.api.gouv.fr](https://geo.api.gouv.fr) (API officielle,
+  gratuite, sans clé) : recherche par nom, renvoie code INSEE, EPCI et
+  département.
+- **Établissements** — [data.education.gouv.fr](https://data.education.gouv.fr)
+  (annuaire de l'éducation, dataset `fr-en-annuaire-education`) : liste des
+  écoles/collèges/lycées ouverts dans la commune choisie. Cet annuaire ne
+  couvre que les établissements de l'Éducation nationale — les structures
+  périscolaires (centre de loisirs, garderie…) n'y figurent pas, d'où
+  l'option « Autre / structure périscolaire non listée » avec saisie
+  manuelle du nom.
+
+Ces deux routes sont proxyfiées côté serveur (`app/api/geo/communes`,
+`app/api/geo/etablissements`) pour éviter tout appel direct depuis le
+navigateur. À la soumission, `/api/signalement` crée (ou réutilise, par code
+INSEE / UAI) la `Commune` et l'`Etablissement` correspondants en base.
+
+La **gravité n'est plus auto-déclarée par le parent** (l'ancien champ
+« gravité perçue » a été retiré) : elle est dérivée automatiquement de la
+catégorie choisie (`config.ts` -> `CATEGORIE_GRAVITE`). Les catégories de
+violences physiques ou sexuelles sont classées `grave` par construction, ce
+qui déclenche le principe 8 (clôture par accord mutuel impossible sans
+validation de l'association tierce).
+
 ## Jeu de données de démonstration
 
 Le seed (`prisma/seed.ts`) génère :
