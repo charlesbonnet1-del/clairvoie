@@ -117,6 +117,9 @@ async function main() {
       displayName: "Camille Durand",
       email: "parent@demo.clairvoie",
       passwordHash,
+      telephone: "06 00 00 00 00",
+      emailVerifie: true,
+      telephoneVerifie: true,
     },
   });
   await prisma.identity.create({

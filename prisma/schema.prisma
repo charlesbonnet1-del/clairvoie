@@ -32,6 +32,19 @@ model Identity {
   // Rattachement pour les comptes ETABLISSEMENT (quel établissement gèrent-ils).
   etablissementId String?
   createdAt     DateTime @default(now())
+
+  // Coordonnées du parent lui-même (pas celles d'un établissement) : pour
+  // qu'un parent puisse être recontacté par l'association tierce, son email
+  // et son téléphone doivent tous les deux être vérifiés — voir
+  // lib/parentAuth.ts. Un signalement ne peut être déposé tant que ce n'est
+  // pas le cas (RegleMetierError dans /api/signalement).
+  telephone            String?
+  emailVerifie         Boolean  @default(false)
+  telephoneVerifie     Boolean  @default(false)
+  // Codes de vérification à usage unique (démo : générés et affichés à
+  // l'écran, jamais réellement envoyés — voir lib/parentAuth.ts).
+  codeVerificationEmail     String?
+  codeVerificationTelephone String?
 }
 
 // ---------------------------------------------------------------------------

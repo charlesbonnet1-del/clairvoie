@@ -73,6 +73,12 @@ export default async function LoginPage({
             Se connecter
           </button>
         </form>
+        <p className="text-center text-sm text-slate-500">
+          Pas encore de compte parent ?{" "}
+          <a href="/inscription" className="text-clairvoie-bleuclair underline">
+            Créer un compte
+          </a>
+        </p>
       </div>
 
       <div className="card">

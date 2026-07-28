@@ -11,6 +11,9 @@ export default async function NouveauSignalementPage({
   if (!identity || identity.role !== "PARENT") {
     redirect("/login");
   }
+  if (!identity.emailVerifie || !identity.telephoneVerifie) {
+    redirect("/verification-compte");
+  }
 
   return (
     <div className="mx-auto max-w-xl">

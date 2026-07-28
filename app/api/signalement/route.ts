@@ -8,6 +8,9 @@ import { CATEGORIES, TYPES_CONTACT, deriverGraviteDepuisCategorie } from "@/conf
 export async function POST(req: NextRequest) {
   try {
     const identity = await requireRole("PARENT");
+    if (!identity.emailVerifie || !identity.telephoneVerifie) {
+      return NextResponse.redirect(new URL("/verification-compte", req.url), { status: 303 });
+    }
     const formData = await req.formData();
     const communeCodeInsee = String(formData.get("communeCodeInsee") ?? "");
     const communeNom = String(formData.get("communeNom") ?? "");
@@ -18,9 +21,7 @@ export async function POST(req: NextRequest) {
     const etablissementAdresse = String(formData.get("etablissementAdresse") ?? "");
     const categorie = String(formData.get("categorie") ?? "");
     const contenu = String(formData.get("contenu") ?? "");
-    const contactSecondaireType = String(formData.get("contactSecondaireType") ?? "");
-    const contactSecondaireValeur = String(formData.get("contactSecondaireValeur") ?? "");
-    const contactSecondairePorteur = String(formData.get("contactSecondairePorteur") ?? "");
+    const contactsSecondairesJson = String(formData.get("contactsSecondairesJson") ?? "[]");
 
     if (!communeNom || !etablissementNom || !categorie || !contenu.trim()) {
       return NextResponse.redirect(
@@ -45,16 +46,25 @@ export async function POST(req: NextRequest) {
       etablissementAdresse,
     });
 
-    if (
-      contactSecondaireValeur.trim() &&
-      TYPES_CONTACT.includes(contactSecondaireType as (typeof TYPES_CONTACT)[number])
-    ) {
-      await ajouterContactSecondaireParent({
-        etablissementId,
-        type: contactSecondaireType,
-        valeur: contactSecondaireValeur,
-        porteur: contactSecondairePorteur,
-      });
+    let contactsSecondaires: Array<{ type?: string; valeur?: string; porteur?: string }> = [];
+    try {
+      const parsed = JSON.parse(contactsSecondairesJson);
+      if (Array.isArray(parsed)) contactsSecondaires = parsed;
+    } catch {
+      contactsSecondaires = [];
+    }
+
+    for (const contact of contactsSecondaires) {
+      const type = String(contact.type ?? "");
+      const valeur = String(contact.valeur ?? "");
+      if (valeur.trim() && TYPES_CONTACT.includes(type as (typeof TYPES_CONTACT)[number])) {
+        await ajouterContactSecondaireParent({
+          etablissementId,
+          type,
+          valeur,
+          porteur: String(contact.porteur ?? ""),
+        });
+      }
     }
 
     const ticket = await creerSignalement({

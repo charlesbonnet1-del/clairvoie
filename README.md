@@ -87,6 +87,21 @@ L'écran `/login` simule un choix de fournisseur d'identité
 (« FranceConnect (démo) », « EduConnect (démo) ») : il ne s'agit que d'une
 mise en scène visuelle, sans aucun appel réel à un fournisseur d'identité.
 
+## Inscription parent et vérification obligatoire
+
+Un nouveau parent peut créer un compte sur `/inscription` (email, téléphone,
+mot de passe). **Email et téléphone doivent tous les deux être vérifiés**
+avant de pouvoir déposer un signalement — c'est ce qui garantit que
+l'association tierce peut effectivement recontacter le parent si besoin
+(`Identity.emailVerifie` / `telephoneVerifie`, vérifié à la fois côté page
+et côté route `/api/signalement`).
+
+Démo — aucun email ni SMS n'est réellement envoyé (`lib/parentAuth.ts`,
+`# TODO: intégration réelle`) : les codes à 6 chiffres générés à
+l'inscription sont affichés directement sur `/verification-compte`, comme
+s'ils venaient d'être reçus. Le compte de démo `parent@demo.clairvoie` est
+pré-vérifié dans le seed.
+
 ## Dépôt de signalement : commune et établissement réels
 
 Le formulaire `/parent/nouveau-signalement` ne fait plus choisir
@@ -116,11 +131,16 @@ violences physiques ou sexuelles sont classées `grave` par construction, ce
 qui déclenche le principe 8 (clôture par accord mutuel impossible sans
 validation de l'association tierce).
 
-Le parent peut aussi proposer un **moyen de contact secondaire** pour
-l'établissement (email, téléphone avec son porteur, adresse postale). Ce
-n'est jamais la source principale des coordonnées : le canal créé est
-marqué `source = "propose_par_parent"` et `statutVerification =
-"non_verifie"` jusqu'à ce qu'une tentative de contact réelle aboutisse.
+Une fois l'établissement choisi, ses **coordonnées officielles connues**
+s'affichent directement dans le formulaire (type, valeur, statut de
+vérification), via `app/api/geo/etablissements/[uai]/contacts` — qui
+synchronise l'établissement depuis l'annuaire au passage si besoin. Le
+parent peut aussi **ajouter plusieurs moyens de contact secondaires**
+(email, téléphone avec son porteur, adresse postale — bouton « + Ajouter un
+contact », répétable). Ce n'est jamais la source principale des
+coordonnées : chaque canal ainsi créé est marqué `source =
+"propose_par_parent"` et `statutVerification = "non_verifie"` jusqu'à ce
+qu'une tentative de contact réelle aboutisse.
 
 ## Coordonnées d'établissement vérifiées et accusé de réception
 

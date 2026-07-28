@@ -30,6 +30,16 @@ export default async function ParentPage({
         </Link>
       </div>
 
+      {(!identity.emailVerifie || !identity.telephoneVerifie) && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Votre email et votre téléphone doivent être vérifiés avant de pouvoir déposer un
+          nouveau signalement.{" "}
+          <Link href="/verification-compte" className="underline">
+            Vérifier maintenant
+          </Link>
+        </p>
+      )}
+
       {searchParams.success && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           Action effectuée avec succès.
