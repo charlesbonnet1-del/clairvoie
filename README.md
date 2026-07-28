@@ -180,15 +180,16 @@ prête pour la production :
    - `DATABASE_URL` — connexion Supabase via le pooler (port `6543`)
    - `DIRECT_URL` — connexion Supabase directe (port `5432`)
    - `SESSION_SECRET` — une valeur aléatoire longue
-4. Dans les paramètres du projet Vercel (**Settings → Build & Development
-   Settings → Build Command**), remplacez la commande de build par :
-   `npx prisma db push --accept-data-loss && next build` — ou, pour aussi
-   repeupler la base de démonstration à chaque déploiement (preview
-   uniquement, jamais sur une base contenant de vraies données) :
-   `npx prisma db push --accept-data-loss && npx prisma db seed && next build`.
-   (`db push` synchronise directement `schema.prisma` sur la base — ce
-   projet n'utilise pas `prisma migrate`, voir la section Base de données
-   ci-dessus.)
+   - `SEED_ON_BUILD=true` — **uniquement** pour peupler ou réinitialiser les
+     données de démo au prochain déploiement (voir point 4) ; à retirer une
+     fois les données en place si vous ne voulez plus qu'elles soient
+     réinitialisées à chaque déploiement
+4. Rien d'autre à configurer : la commande de build (`npm run build`, déjà
+   dans `package.json`) exécute automatiquement `prisma db push` avant
+   `next build`, sur n'importe quel environnement Vercel — aucune commande
+   de build personnalisée à définir dans le dashboard. Si `SEED_ON_BUILD` est
+   à `true`, `prisma db seed` s'exécute aussi (voir `scripts/conditional-seed.js`) ;
+   sinon cette étape est simplement ignorée, sans erreur.
 5. (Optionnel) Configurez un Vercel Cron Job pointant vers
    `/api/cron/escalade` pour déclencher automatiquement l'escalade des
    signalements en silence — voir la
