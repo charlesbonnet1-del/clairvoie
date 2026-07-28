@@ -55,6 +55,12 @@ model Commune {
   nom            String
   epci           String
   departement    String
+  // Académie de rattachement (voir lib/academies.ts). Table de correspondance
+  // département -> académie volontairement statique et limitée : à remplacer
+  // par un référentiel officiel avant tout usage en production. Valeur de
+  // repli non bloquante, comme epci/departement ci-dessus.
+  // TODO: intégration réelle (référentiel académique officiel)
+  academie       String          @default("Académie inconnue")
   // Code INSEE (geo.api.gouv.fr) : sert de clé d'upsert quand une commune
   // est renseignée via la recherche publique plutôt que par le seed de démo
   // (auquel cas ce champ reste null — communes fictives, pas de code réel).
@@ -252,4 +258,41 @@ model SuiteJudiciaire {
   // intégrations externes du projet).
   documentRef String?
   declaredAt  DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Score de reconnaissance ("exemplarité") d'une entité (établissement,
+// commune, EPCI, département, académie) — uniquement des métriques de
+// process (délai, taux de réponse dans les délais, taux de dossiers résolus
+// sans blocage), jamais le volume de signalements reçus : voir
+// lib/exemplarite.ts, qui est le seul point de calcul et de lecture de ce
+// modèle. nombreCasEligibles ne sert qu'à vérifier le seuil minimal avant
+// tout classement — il n'entre jamais dans le calcul du score lui-même.
+//
+// Pas de badge permanent : chaque exécution du job périodique
+// (lib/exemplarite.ts -> calculerScores) crée de nouvelles lignes
+// horodatées (calculeLe) pour la période ; lib/exemplarite.ts ->
+// getClassement exclut toute ligne de plus de BADGE_STALENESS_DAYS
+// (config.ts) et revérifie en temps réel qu'aucun ticket actif de l'entité
+// n'est actuellement en dépassement de délai (estExemplaireSuspendu),
+// indépendamment du score historique.
+// ---------------------------------------------------------------------------
+model ExemplariteScore {
+  id                 String   @id @default(cuid())
+  entiteType         String   // "etablissement" | "commune" | "epci" | "departement" | "academie"
+  // Identifiant de l'entité : l'id réel (Etablissement.id / Commune.id) pour
+  // "etablissement"/"commune" ; le libellé de la maille (epci/departement/
+  // academie sont de simples champs texte, pas des tables normalisées, à
+  // l'image de lib/kAnonymity.ts) pour les trois autres types.
+  entiteId           String
+  periodeDebut       DateTime
+  periodeFin         DateTime
+  delaiMoyenReponse  Float // en heures
+  tauxReponseDelai   Float // 0-1
+  tauxSansBlocage    Float // 0-1
+  nombreCasEligibles Int // seuil uniquement, jamais utilisé dans le score
+  calculeLe          DateTime @default(now())
+
+  @@index([entiteType, entiteId])
+  @@index([entiteType, periodeDebut, periodeFin])
 }

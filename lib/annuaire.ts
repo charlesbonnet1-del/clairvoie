@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { fetchAnnuaireRecords, AnnuaireIndisponibleError } from "./annuaireApi";
 import { recupererCommuneParCode } from "./geoApi";
+import { deriverAcademie } from "./academies";
 import { ANNUAIRE_REFRESH_DAYS } from "@/config";
 import type { Etablissement } from "@prisma/client";
 
@@ -99,6 +100,7 @@ export async function refreshEtablissement(
       nom: nomCommune,
       epci,
       departement,
+      academie: deriverAcademie(departement),
       codeInsee: codeCommune || `inconnu-${uai}`,
     },
   });

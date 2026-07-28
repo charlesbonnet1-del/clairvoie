@@ -1,11 +1,45 @@
 import { computeDashboardStats } from "@/lib/dashboardStats";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
+import { getClassement, type EntreeClassement } from "@/lib/exemplarite";
+import { prisma } from "@/lib/prisma";
+import { ENTITES_EXEMPLARITE, BADGE_STALENESS_DAYS, type EntiteExemplarite } from "@/config";
 
 const MAILLE_LABELS: Record<string, string> = {
   commune: "Commune",
   epci: "EPCI",
   departement: "Département",
 };
+
+const ENTITE_EXEMPLARITE_LABELS: Record<EntiteExemplarite, string> = {
+  etablissement: "Établissement",
+  commune: "Commune",
+  epci: "EPCI",
+  departement: "Département",
+  academie: "Académie",
+};
+
+/**
+ * Résout un entiteId affichable en nom lisible : id réel (Etablissement /
+ * Commune) pour ces deux types, simple libellé de maille pour les trois
+ * autres (epci/departement/academie ne sont que des champs texte, pas des
+ * tables normalisées — voir lib/kAnonymity.ts et lib/exemplarite.ts).
+ */
+async function resoudreNomsEntites(
+  entiteType: EntiteExemplarite,
+  entiteIds: string[]
+): Promise<Map<string, string>> {
+  if (entiteType === "etablissement") {
+    const etablissements = await prisma.etablissement.findMany({
+      where: { id: { in: entiteIds } },
+    });
+    return new Map(etablissements.map((e) => [e.id, e.nom]));
+  }
+  if (entiteType === "commune") {
+    const communes = await prisma.commune.findMany({ where: { id: { in: entiteIds } } });
+    return new Map(communes.map((c) => [c.id, c.nom]));
+  }
+  return new Map(entiteIds.map((id) => [id, id]));
+}
 
 function pct(value: number | null): string {
   if (value === null) return "—";
@@ -23,6 +57,17 @@ export default async function DashboardPage() {
   const stats = await computeDashboardStats();
   const maxStatutCount = Math.max(1, ...Object.values(stats.global.repartitionStatuts));
   const maxGeoCount = Math.max(1, ...stats.parGeographie.map((g) => g.count));
+
+  const classements = await Promise.all(
+    ENTITES_EXEMPLARITE.map(async (entiteType) => {
+      const classement = await getClassement(entiteType);
+      const noms = await resoudreNomsEntites(
+        entiteType,
+        classement.map((c) => c.entiteId)
+      );
+      return { entiteType, classement, noms };
+    })
+  );
 
   return (
     <div className="space-y-8">
@@ -142,6 +187,55 @@ export default async function DashboardPage() {
           {Object.keys(stats.suiteJudiciaire.repartition).length === 0 && (
             <span className="text-sm text-slate-400">Aucune suite déclarée pour le moment.</span>
           )}
+        </div>
+      </div>
+
+      <div className="card border-2 border-clairvoie-vert/30">
+        <h2 className="font-semibold text-slate-700">
+          Établissements et collectivités exemplaires
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Reconnaissance basée uniquement sur la qualité du traitement — délai
+          moyen de réponse, respect des délais, dossiers menés à terme sans
+          blocage — jamais sur le nombre de signalements reçus. Un badge
+          disparaît immédiatement si un dossier de l&apos;entité est
+          actuellement en dépassement de délai, et n&apos;est plus affiché
+          au-delà de {BADGE_STALENESS_DAYS} jours sans nouveau calcul.
+        </p>
+        <div className="mt-4 space-y-5">
+          {classements.map(({ entiteType, classement, noms }) => (
+            <div key={entiteType}>
+              <p className="text-xs font-medium uppercase text-slate-400">
+                {ENTITE_EXEMPLARITE_LABELS[entiteType]}
+              </p>
+              {classement.length === 0 ? (
+                <p className="mt-1 text-sm text-slate-400">
+                  Aucune entité n&apos;atteint pour le moment le volume
+                  minimal requis pour être publiée à cette maille.
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {classement.map((entree: EntreeClassement) => (
+                    <li
+                      key={entree.entiteId}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2"
+                    >
+                      <span className="text-sm font-medium text-slate-700">
+                        {noms.get(entree.entiteId) ?? entree.entiteId}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        Délai moyen : {heures(entree.delaiMoyenReponse)} · Réponse
+                        dans les délais : {pct(entree.tauxReponseDelai)}
+                      </span>
+                      <span className="badge bg-emerald-100 text-emerald-800">
+                        Volume suffisant pour publication
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

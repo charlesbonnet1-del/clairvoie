@@ -156,6 +156,26 @@ export const STATUTS_SUITE_JUDICIAIRE = [
 ] as const;
 export type StatutSuiteJudiciaire = (typeof STATUTS_SUITE_JUDICIAIRE)[number];
 
+/** Types d'entité éligibles au classement d'exemplarité (établissements et
+ * collectivités reconnus pour la qualité de leur process, jamais pour leur
+ * volume de signalements — voir lib/exemplarite.ts). */
+export const ENTITES_EXEMPLARITE = [
+  "etablissement",
+  "commune",
+  "epci",
+  "departement",
+  "academie",
+] as const;
+export type EntiteExemplarite = (typeof ENTITES_EXEMPLARITE)[number];
+
+/** Durée de validité d'un score d'exemplarité avant qu'il ne soit considéré
+ * périmé et exclu de tout classement (principe 3 : aucun badge permanent). */
+export const BADGE_STALENESS_DAYS = 30;
+
+/** Largeur (en jours) de la période glissante sur laquelle les scores
+ * d'exemplarité sont calculés à chaque exécution du job périodique. */
+export const EXEMPLARITE_PERIODE_JOURS = 90;
+
 /** Origine d'une suite judiciaire déclarée : la plainte directe du parent et
  * l'escalade établissement -> rectorat sont deux voies de saisine
  * indépendantes, qui peuvent coexister ("les_deux") sans jamais donner lieu

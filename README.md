@@ -271,6 +271,60 @@ reçoit que le taux de complétude déclaratif et une répartition agrégée par
 Vérifié par `tests/test_origine_les_deux_pas_de_doublon.test.ts` et
 `tests/test_bandeau_plainte_visible_etablissement_uniquement.test.ts`.
 
+## Reconnaissance des établissements/collectivités exemplaires
+
+Une section « Établissements et collectivités exemplaires » du tableau de
+bord public (`(public)/dashboard/page.tsx`) publie un classement positif par
+maille (établissement, commune, EPCI, département, académie), calculé et
+lu par `lib/exemplarite.ts` — qui réutilise le seuil de k-anonymité et la
+maille géographique dynamique déjà en place pour `/api/dashboard/stats`
+(`lib/kAnonymity.ts` -> `K_ANONYMITY_THRESHOLD`), sans dupliquer cette
+logique.
+
+Objectif : ne jamais récompenser la suppression du signal (moins de
+signalements reçus) plutôt que la qualité du traitement. En conséquence :
+
+- **Le score ne dépend que de métriques de process** — délai moyen de
+  réponse, taux de réponse dans les délais, taux de dossiers résolus sans
+  blocage (`clôturé_accord_mutuel`/`trianguléfondé`/`trianguléinfondé`) —
+  jamais du volume de signalements reçus. `ExemplariteScore.nombreCasEligibles`
+  n'existe que pour vérifier le seuil d'éligibilité (voir ci-dessous) ; il
+  n'est jamais un paramètre de `lib/exemplarite.ts` ->
+  `calculerScoreProcess`, la seule fonction qui dérive un score comparable
+  à partir des trois métriques.
+- **Seuil d'éligibilité minimum** : une entité dont le nombre de cas clos
+  sur la période est inférieur à `K_ANONYMITY_THRESHOLD` n'apparaît dans
+  aucun classement, ni bon ni mauvais.
+- **Aucun badge permanent** : `calculerScores` (déclenché par
+  `/api/cron/exemplarite`, tâche de fond récurrente au même titre que
+  `/api/cron/escalade` — jamais recalculé à la volée sur une requête
+  utilisateur) écrit des scores horodatés (`calculeLe`) pour une période
+  glissante de `EXEMPLARITE_PERIODE_JOURS` jours ; `getClassement` exclut
+  tout score de plus de `BADGE_STALENESS_DAYS` jours (30 par défaut) sans
+  recalcul.
+- **Suspension immédiate** : avant tout affichage, `estExemplaireSuspendu`
+  vérifie en temps réel (jamais mis en cache) qu'aucun ticket actif de
+  l'entité n'est actuellement au-delà de son délai de réponse
+  (`RESPONSE_DEADLINE_HOURS`, réception confirmée dépassée sans réponse).
+  Si c'est le cas, le badge est masqué immédiatement, quel que soit le
+  score historique.
+
+La vue publique n'affiche jamais le nombre de cas en valeur absolue — une
+mention qualitative (« Volume suffisant pour publication ») en tient lieu,
+pour éviter qu'un chiffre brut soit interprété comme un critère de mérite.
+
+Simplification assumée : le regroupement par « académie » s'appuie sur
+`lib/academies.ts`, une table statique département -> académie
+volontairement limitée aux départements du jeu de démonstration (Ardèche,
+Isère, Rhône) — à remplacer par un référentiel officiel avant tout usage en
+production, le découpage académique n'étant pas exposé par
+geo.api.gouv.fr.
+
+Vérifié par `tests/test_volume_neutre_dans_le_score.test.ts`,
+`tests/test_seuil_eligibilite_exemplarite.test.ts`,
+`tests/test_suspension_badge_ticket_en_retard.test.ts` et
+`tests/test_badge_expire_sans_recalcul.test.ts`.
+
 ## Jeu de données de démonstration
 
 Le seed (`prisma/seed.ts`) génère :
@@ -381,7 +435,9 @@ prête pour la production :
    sinon cette étape est simplement ignorée, sans erreur.
 5. (Optionnel) Configurez un Vercel Cron Job pointant vers
    `/api/cron/escalade` pour déclencher automatiquement l'escalade des
-   signalements en silence — voir la
+   signalements en silence, et un second vers `/api/cron/exemplarite` pour
+   recalculer les scores de reconnaissance des établissements/collectivités
+   exemplaires — voir la
    [documentation Vercel Cron Jobs](https://vercel.com/docs/cron-jobs). Si
    vous définissez `CRON_SECRET` dans les variables d'environnement, protégez
    l'appel avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.

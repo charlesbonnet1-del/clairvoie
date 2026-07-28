@@ -3,6 +3,8 @@ import { hashPassword } from "../lib/password";
 import { appendAuditLog } from "../lib/hashchain";
 import { escaladerSiSilence, declarerPlainteDirecte } from "../lib/tickets";
 import { enregistrerPersonneMiseEnCause } from "../lib/personneMiseEnCause";
+import { deriverAcademie } from "../lib/academies";
+import { calculerScores, periodeCourante } from "../lib/exemplarite";
 
 function daysAgo(days: number, hours = 0): Date {
   return new Date(Date.now() - (days * 24 + hours) * 60 * 60 * 1000);
@@ -27,6 +29,7 @@ async function log(ticketId: string, action: string, acteurPseudo: string) {
 async function main() {
   console.log("Nettoyage de la base…");
   await prisma.auditLog.deleteMany();
+  await prisma.exemplariteScore.deleteMany();
   await prisma.suiteJudiciaire.deleteMany();
   await prisma.tentativeContact.deleteMany();
   await prisma.personneMiseEnCause.deleteMany();
@@ -43,16 +46,23 @@ async function main() {
       nom: "Sainte-Colombe",
       epci: "CC du Pays de Sainte-Colombe",
       departement: "Ardèche",
+      academie: deriverAcademie("Ardèche"),
     },
   });
   const moyenne = await prisma.commune.create({
-    data: { nom: "Vallonry", epci: "CA de Vallonry", departement: "Isère" },
+    data: {
+      nom: "Vallonry",
+      epci: "CA de Vallonry",
+      departement: "Isère",
+      academie: deriverAcademie("Isère"),
+    },
   });
   const grande = await prisma.commune.create({
     data: {
       nom: "Grandvillier",
       epci: "Métropole de Grandvillier",
       departement: "Rhône",
+      academie: deriverAcademie("Rhône"),
     },
   });
 
@@ -498,6 +508,12 @@ async function main() {
   console.log("Exécution de l'escalade automatique (cron) pour les signalements en silence…");
   const escalades = await escaladerSiSilence();
   console.log(`  -> ${escalades.length} signalement(s) escaladé(s) automatiquement.`);
+
+  console.log("Calcul des scores d'exemplarité (job périodique)…");
+  const nombreScores = await calculerScores(periodeCourante());
+  console.log(
+    `  -> ${nombreScores} entité(s) ayant atteint le seuil d'éligibilité et reçu un score.`
+  );
 
   console.log("\nSeed terminé.");
   console.log(

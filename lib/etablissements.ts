@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { RegleMetierError } from "./tickets";
 import { syncEtablissementDepuisAnnuaire } from "./annuaire";
+import { deriverAcademie } from "./academies";
 
 /**
  * Résout l'établissement choisi dans le formulaire de signalement en un
@@ -39,13 +40,15 @@ export async function resoudreEtablissement(params: {
     return etablissement.id;
   }
 
+  const communeDepartement = params.communeDepartement || "Département inconnu";
   const commune = await prisma.commune.upsert({
     where: { codeInsee: params.communeCodeInsee },
     update: {},
     create: {
       nom: params.communeNom,
       epci: params.communeEpci || "EPCI inconnu",
-      departement: params.communeDepartement || "Département inconnu",
+      departement: communeDepartement,
+      academie: deriverAcademie(communeDepartement),
       codeInsee: params.communeCodeInsee,
     },
   });
