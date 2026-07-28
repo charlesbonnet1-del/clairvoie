@@ -5,6 +5,7 @@ import { CATEGORIES } from "@/config";
 import type { CommuneSuggestion } from "@/app/api/geo/communes/route";
 import type { EtablissementSuggestion } from "@/app/api/geo/etablissements/route";
 import type { ContactOfficielAffiche } from "@/app/api/geo/etablissements/[uai]/contacts/route";
+import DropZoneFichier from "./DropZoneFichier";
 
 const AUTRE_ETABLISSEMENT = "__autre__";
 
@@ -63,6 +64,9 @@ export default function SignalementForm() {
   const [personnesMiseEnCause, setPersonnesMiseEnCause] = useState<PersonneMiseEnCauseSaisie[]>(
     []
   );
+
+  const [plainteDeposee, setPlainteDeposee] = useState(false);
+  const [recepisseFile, setRecepisseFile] = useState<File | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -176,7 +180,8 @@ export default function SignalementForm() {
   const formValide =
     Boolean(selectedCommune) &&
     Boolean(etablissementChoice) &&
-    (etablissementChoice !== AUTRE_ETABLISSEMENT || etablissementManuelNom.trim().length > 0);
+    (etablissementChoice !== AUTRE_ETABLISSEMENT || etablissementManuelNom.trim().length > 0) &&
+    (!plainteDeposee || recepisseFile !== null);
 
   const contactsSecondairesJson = JSON.stringify(
     contactsSecondaires
@@ -191,7 +196,12 @@ export default function SignalementForm() {
   );
 
   return (
-    <form action="/api/signalement" method="post" className="card mt-6 space-y-4">
+    <form
+      action="/api/signalement"
+      method="post"
+      encType="multipart/form-data"
+      className="card mt-6 space-y-4"
+    >
       <input type="hidden" name="communeCodeInsee" value={selectedCommune?.codeInsee ?? ""} />
       <input type="hidden" name="communeNom" value={selectedCommune?.nom ?? ""} />
       <input type="hidden" name="communeEpci" value={selectedCommune?.epci ?? ""} />
@@ -483,6 +493,43 @@ export default function SignalementForm() {
             </label>
           </div>
         ))}
+      </div>
+
+      {/* Plainte déposée directement (optionnel) */}
+      <div className="rounded-lg border border-dashed border-slate-300 p-3 space-y-3">
+        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+          <input
+            type="checkbox"
+            name="plainteDeposee"
+            value="oui"
+            className="h-4 w-4"
+            checked={plainteDeposee}
+            onChange={(e) => {
+              setPlainteDeposee(e.target.checked);
+              if (!e.target.checked) setRecepisseFile(null);
+            }}
+          />
+          J&apos;ai déposé plainte directement auprès de la police/gendarmerie
+        </label>
+        <p className="text-xs text-slate-400">
+          Optionnel, indépendant du traitement de ce signalement par
+          l&apos;établissement — cette information ne lui est jamais transmise.
+          Vous pourrez aussi l&apos;ajouter plus tard depuis le suivi de votre
+          signalement.
+        </p>
+        {plainteDeposee && (
+          <>
+            <DropZoneFichier
+              name="recepisse"
+              label="Récépissé de dépôt de plainte"
+              onFileChange={setRecepisseFile}
+            />
+            <p className="text-xs text-slate-400">
+              Ce document est indispensable : sans lui, la plainte ne peut pas
+              être enregistrée.
+            </p>
+          </>
+        )}
       </div>
 
       {/* 5. Catégorie */}

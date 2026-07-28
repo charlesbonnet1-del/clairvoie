@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, UnauthorizedError } from "@/lib/auth";
-import { creerSignalement, RegleMetierError } from "@/lib/tickets";
+import { creerSignalement, declarerPlainteDirecte, RegleMetierError } from "@/lib/tickets";
 import { resoudreEtablissement, ajouterContactSecondaireParent } from "@/lib/etablissements";
 import { tenterContactEtablissement } from "@/lib/contactVerification";
 import { enregistrerPersonneMiseEnCause } from "@/lib/personneMiseEnCause";
@@ -95,6 +95,22 @@ export async function POST(req: NextRequest) {
         nom: personne.nom,
         fonction: personne.fonction,
         recurrent: Boolean(personne.recurrent),
+      });
+    }
+
+    // Plainte déposée directement par le parent (optionnelle, sans lien avec
+    // le traitement du signalement par l'établissement). N'est enregistrée
+    // que si le récépissé de dépôt de plainte est fourni : sans document,
+    // rien n'est créé plutôt que de bloquer le dépôt du signalement.
+    const plainteDeposee = String(formData.get("plainteDeposee") ?? "") === "oui";
+    const recepisse = formData.get("recepisse");
+    const documentRefPlainte =
+      recepisse instanceof File && recepisse.size > 0 ? recepisse.name : null;
+    if (plainteDeposee && documentRefPlainte) {
+      await declarerPlainteDirecte({
+        ticketId: ticket.id,
+        acteurPseudo: identity.pseudoId,
+        documentRef: documentRefPlainte,
       });
     }
 

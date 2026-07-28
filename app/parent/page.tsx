@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { STATUTS_SUITE_JUDICIAIRE } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
 import DateFaitsLigne from "@/components/DateFaitsLigne";
+import PlainteDirecteForm from "@/components/PlainteDirecteForm";
 
 export default async function ParentPage({
   searchParams,
@@ -154,34 +155,7 @@ export default async function ParentPage({
                     police/gendarmerie (auto-déclaratif, non vérifié).
                   </p>
                 ) : (
-                  <form
-                    action={`/api/signalement/${ticket.id}/plainte-directe`}
-                    method="post"
-                    encType="multipart/form-data"
-                    className="flex flex-wrap items-center gap-2"
-                  >
-                    <label className="text-xs text-slate-600">
-                      J&apos;ai déposé plainte directement auprès de la police/gendarmerie :
-                    </label>
-                    <select
-                      name="plainteDeposee"
-                      className="input w-auto text-xs"
-                      required
-                      defaultValue="non"
-                    >
-                      <option value="non">Non</option>
-                      <option value="oui">Oui</option>
-                    </select>
-                    <input
-                      type="file"
-                      name="recepisse"
-                      className="text-xs"
-                      aria-label="Récépissé de dépôt de plainte (optionnel)"
-                    />
-                    <button type="submit" className="btn btn-secondary text-xs">
-                      Enregistrer
-                    </button>
-                  </form>
+                  <PlainteDirecteForm ticketId={ticket.id} />
                 )}
               </div>
 

@@ -84,6 +84,10 @@ export default async function EtablissementPage({
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
             <DateFaitsLigne ticket={ticket} />
 
+            {/* Fait strictement informatif : jamais le document justificatif
+                (récépissé de dépôt de plainte) ni aucun autre détail de la
+                SuiteJudiciaire ne sont exposés ici, uniquement ce booléen
+                d'origine. */}
             {ticket.suitesJudiciaires.some(
               (s) => s.origine === "plainte_directe_parent" || s.origine === "les_deux"
             ) && (

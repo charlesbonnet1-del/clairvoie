@@ -235,21 +235,28 @@ Le modèle `SuiteJudiciaire` distingue les deux via le champ `origine` :
 - `"plainte_directe_parent"` (plainte directe, sans lien avec l'escalade) ;
 - `"les_deux"`, quand les deux coexistent pour un même ticket.
 
-Dans le suivi de son signalement (`/parent`), le parent peut à tout moment
-indiquer « J'ai déposé plainte » (oui/non), indépendamment du statut
-d'escalade du ticket. En cas de réponse positive, il peut, sans y être
-obligé, joindre le récépissé de dépôt de plainte — capture par document
-plutôt que déclaration libre, pour plus de fiabilité (même logique que le
-téléversement, optionnel lui aussi, d'un document justificatif lors d'une
-déclaration de suite judiciaire classique, ex. courrier de classement sans
-suite). Aucun stockage réel dans ce MVP : seul le nom du fichier est retenu
-comme référence (`documentRef`), à l'image des autres intégrations externes
-mockées du projet.
+La déclaration se fait en priorité **au moment du dépôt du signalement**
+(case à cocher « J'ai déposé plainte directement auprès de la
+police/gendarmerie » dans le formulaire de dépôt), avec une zone de
+téléversement cliquable/glissable (`components/DropZoneFichier.tsx`) pour le
+récépissé de dépôt de plainte. Elle reste néanmoins possible à tout moment
+par la suite depuis le suivi du signalement (`/parent`) si elle n'a pas été
+faite au dépôt, indépendamment du statut d'escalade du ticket.
 
-`lib/tickets.ts` -> `declarerPlainteDirecte` garantit qu'aucun doublon n'est
-jamais créé : si une `SuiteJudiciaire` `"transmission_etablissement"` existe
-déjà pour le ticket, elle est mise à jour vers `"les_deux"` ; une plainte
-directe déjà déclarée est mise à jour de façon idempotente (pas de second
+**Le document justificatif est obligatoire** : contrairement au reste de
+`SuiteJudiciaire` (purement auto-déclaratif), une plainte directe n'est
+enregistrée que si le récépissé est fourni — sans document, rien n'est
+enregistré (`lib/tickets.ts` -> `declarerPlainteDirecte` refuse
+explicitement toute déclaration sans `documentRef`). Aucun stockage réel
+dans ce MVP : seul le nom du fichier est retenu comme référence, à l'image
+des autres intégrations externes mockées du projet — et **ce document n'est
+jamais transmis à l'établissement**, qui ne reçoit que le fait informatif
+(bandeau ci-dessous), jamais la pièce elle-même.
+
+`declarerPlainteDirecte` garantit aussi qu'aucun doublon n'est jamais créé :
+si une `SuiteJudiciaire` `"transmission_etablissement"` existe déjà pour le
+ticket, elle est mise à jour vers `"les_deux"` ; une plainte directe déjà
+déclarée est mise à jour de façon idempotente (pas de second
 enregistrement).
 
 Quand l'origine d'un ticket inclut `"plainte_directe_parent"`, la vue

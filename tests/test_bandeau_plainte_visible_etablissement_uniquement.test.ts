@@ -32,6 +32,14 @@ describe("Bandeau 'plainte déposée directement' — visible uniquement côté 
     ]);
   });
 
+  it("la vue établissement n'affiche jamais le document justificatif de la plainte (documentRef)", () => {
+    const source = readFileSync(
+      path.join(SCAN_ROOT, "app", "etablissement", "page.tsx"),
+      "utf-8"
+    );
+    expect(source).not.toContain("documentRef");
+  });
+
   it("le tableau de bord public n'expose jamais ce bandeau ni l'origine judiciaire individuelle", async () => {
     const response = await getDashboardStats();
     const raw = await response.text();

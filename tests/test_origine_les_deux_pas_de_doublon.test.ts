@@ -67,6 +67,7 @@ describe("SuiteJudiciaire — origine 'les_deux' sans doublon", () => {
     await declarerPlainteDirecte({
       ticketId,
       acteurPseudo: "parent-origine-1",
+      documentRef: "recepisse-plainte-bis.pdf",
     });
 
     const suites = await prisma.suiteJudiciaire.findMany({ where: { ticketId } });
@@ -89,11 +90,42 @@ describe("SuiteJudiciaire — origine 'les_deux' sans doublon", () => {
       gravite: "legere",
     });
 
-    await declarerPlainteDirecte({ ticketId: ticket.id, acteurPseudo: "parent-origine-2" });
-    await declarerPlainteDirecte({ ticketId: ticket.id, acteurPseudo: "parent-origine-2" });
+    await declarerPlainteDirecte({
+      ticketId: ticket.id,
+      acteurPseudo: "parent-origine-2",
+      documentRef: "recepisse.pdf",
+    });
+    await declarerPlainteDirecte({
+      ticketId: ticket.id,
+      acteurPseudo: "parent-origine-2",
+      documentRef: "recepisse.pdf",
+    });
 
     const suites = await prisma.suiteJudiciaire.findMany({ where: { ticketId: ticket.id } });
     expect(suites).toHaveLength(1);
     expect(suites[0].origine).toBe("plainte_directe_parent");
+  });
+
+  it("une plainte directe sans document justificatif est refusée : aucun enregistrement n'est créé", async () => {
+    const commune = await prisma.commune.create({
+      data: { nom: "CommuneOrigine3", epci: "EPCI-Origine3", departement: "Dept-Origine3" },
+    });
+    const etablissement = await prisma.etablissement.create({
+      data: { nom: "Etab-Origine3", communeId: commune.id },
+    });
+    const ticket = await creerSignalement({
+      parentPseudoId: "parent-origine-3",
+      etablissementId: etablissement.id,
+      categorie: "Test",
+      contenu: "Signalement pour test document obligatoire",
+      gravite: "legere",
+    });
+
+    await expect(
+      declarerPlainteDirecte({ ticketId: ticket.id, acteurPseudo: "parent-origine-3", documentRef: "" })
+    ).rejects.toThrow();
+
+    const suites = await prisma.suiteJudiciaire.findMany({ where: { ticketId: ticket.id } });
+    expect(suites).toHaveLength(0);
   });
 });

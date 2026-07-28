@@ -215,16 +215,29 @@ export async function declarerSuiteJudiciaire(params: {
 /**
  * Déclaration par le parent d'une plainte déposée directement auprès de la
  * police/gendarmerie — indépendante du statut d'escalade établissement ->
- * rectorat du ticket. Si une SuiteJudiciaire existe déjà pour ce ticket avec
- * origine "transmission_etablissement", elle est mise à jour vers
- * "les_deux" plutôt que de créer un second enregistrement ; une déclaration
- * répétée est elle aussi idempotente (aucun doublon).
+ * rectorat du ticket. N'est jamais enregistrée sans document justificatif
+ * (récépissé de dépôt de plainte) : la fiabilité de cette déclaration en
+ * dépend, contrairement au reste de SuiteJudiciaire qui reste purement
+ * auto-déclaratif. Cette information n'est jamais transmise à
+ * l'établissement (seul un fait informatif l'est, voir le bandeau côté
+ * etablissement/page.tsx — jamais le document lui-même).
+ *
+ * Si une SuiteJudiciaire existe déjà pour ce ticket avec origine
+ * "transmission_etablissement", elle est mise à jour vers "les_deux" plutôt
+ * que de créer un second enregistrement ; une déclaration répétée est elle
+ * aussi idempotente (aucun doublon).
  */
 export async function declarerPlainteDirecte(params: {
   ticketId: string;
   acteurPseudo: string;
-  documentRef?: string | null;
+  documentRef: string;
 }) {
+  if (!params.documentRef.trim()) {
+    throw new RegleMetierError(
+      "Le document justificatif (récépissé de dépôt de plainte) est obligatoire pour enregistrer une plainte directe."
+    );
+  }
+
   const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
   if (!ticket) throw new RegleMetierError("Signalement introuvable.");
 
@@ -237,10 +250,7 @@ export async function declarerPlainteDirecte(params: {
   if (transmissionExistante) {
     suite = await prisma.suiteJudiciaire.update({
       where: { id: transmissionExistante.id },
-      data: {
-        origine: "les_deux",
-        documentRef: params.documentRef ?? transmissionExistante.documentRef,
-      },
+      data: { origine: "les_deux", documentRef: params.documentRef },
     });
   } else {
     const plainteExistante = await prisma.suiteJudiciaire.findFirst({
@@ -251,14 +261,14 @@ export async function declarerPlainteDirecte(params: {
     suite = plainteExistante
       ? await prisma.suiteJudiciaire.update({
           where: { id: plainteExistante.id },
-          data: { documentRef: params.documentRef ?? plainteExistante.documentRef },
+          data: { documentRef: params.documentRef },
         })
       : await prisma.suiteJudiciaire.create({
           data: {
             ticketId: params.ticketId,
             origine: "plainte_directe_parent",
             statut: "transmis",
-            documentRef: params.documentRef ?? null,
+            documentRef: params.documentRef,
           },
         });
   }

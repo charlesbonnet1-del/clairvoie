@@ -9,22 +9,27 @@ export async function POST(
   try {
     const identity = await requireRole("PARENT");
     const formData = await req.formData();
-    const plainteDeposee = String(formData.get("plainteDeposee") ?? "non") === "oui";
 
-    if (!plainteDeposee) {
-      return NextResponse.redirect(
-        new URL("/parent?success=plainte_non_declaree", req.url),
-        { status: 303 }
-      );
-    }
-
-    // Téléversement optionnel du récépissé de dépôt de plainte : capture par
-    // document plutôt que déclaration libre, pour plus de fiabilité. Aucun
-    // stockage réel dans ce MVP (mock) — seul le nom du fichier est retenu
-    // comme référence.
+    // Le récépissé de dépôt de plainte est obligatoire : une plainte directe
+    // n'est jamais enregistrée sans preuve (contrairement au reste de
+    // SuiteJudiciaire, purement auto-déclaratif). Aucun stockage réel dans
+    // ce MVP (mock) — seul le nom du fichier est retenu comme référence, et
+    // ce document n'est jamais transmis à l'établissement.
     // TODO: intégration réelle (stockage documentaire sécurisé)
     const recepisse = formData.get("recepisse");
     const documentRef = recepisse instanceof File && recepisse.size > 0 ? recepisse.name : null;
+
+    if (!documentRef) {
+      return NextResponse.redirect(
+        new URL(
+          `/parent?error=${encodeURIComponent(
+            "Le récépissé de dépôt de plainte est obligatoire pour enregistrer une plainte directe."
+          )}`,
+          req.url
+        ),
+        { status: 303 }
+      );
+    }
 
     await declarerPlainteDirecte({
       ticketId: params.id,
