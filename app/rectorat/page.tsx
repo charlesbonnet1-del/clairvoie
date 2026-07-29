@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
+import { STATUT_TICKET_LABELS } from "@/lib/labels";
 import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
 import DateFaitsLigne from "@/components/DateFaitsLigne";
 
@@ -12,7 +13,7 @@ export default async function RectoratPage() {
   }
 
   const tickets = await prisma.ticket.findMany({
-    where: { statut: "escaladé" },
+    where: { statut: { in: ["escaladé", "escaladé_rectorat"] } },
     include: { etablissement: { include: { commune: true } } },
     orderBy: { escaladeAt: "desc" },
   });
@@ -35,8 +36,9 @@ export default async function RectoratPage() {
           Signalements escaladés
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Établissements n&apos;ayant pas répondu dans le délai imparti, ou
-          nécessitant une investigation complémentaire après triangulation.
+          Établissements n&apos;ayant pas pris position dans le délai imparti,
+          ou signalements non contestés restés sans clôture du parent au-delà
+          du délai imparti.
         </p>
       </div>
 
@@ -51,7 +53,9 @@ export default async function RectoratPage() {
                   {ticket.gravite}
                 </p>
               </div>
-              <span className="badge badge-escaladé">Escaladé</span>
+              <span className={`badge badge-${ticket.statut}`}>
+                {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
+              </span>
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
             <DateFaitsLigne ticket={ticket} />

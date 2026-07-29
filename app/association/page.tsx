@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { VERDICTS, TYPES_CONTACT } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
 import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
+import { recupererContactParent } from "@/lib/parentAuth";
 import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
 import DateFaitsLigne from "@/components/DateFaitsLigne";
 
@@ -31,7 +32,7 @@ export default async function AssociationPage({
   });
 
   const aTrianguler = await prisma.ticket.findMany({
-    where: { statut: { in: ["répondu", "escaladé"] } },
+    where: { statut: { in: ["triangulation_requise", "escaladé"] } },
     include: { etablissement: { include: { commune: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -41,6 +42,28 @@ export default async function AssociationPage({
       aTrianguler.map(async (ticket) => {
         const personnes = await recupererPersonnesMiseEnCause({ ticketId: ticket.id, identity });
         return [ticket.id, personnes] as const;
+      })
+    )
+  );
+
+  // Coordonnées de l'établissement et du parent, pour permettre à
+  // l'association tierce de les recontacter dans le cadre de son
+  // évaluation — jamais une vue consolidée au-delà du dossier en cours.
+  const contactsEtablissement = new Map(
+    await Promise.all(
+      aTrianguler.map(async (ticket) => {
+        const contacts = await prisma.contactCanal.findMany({
+          where: { etablissementId: ticket.etablissementId },
+        });
+        return [ticket.id, contacts] as const;
+      })
+    )
+  );
+  const contactsParent = new Map(
+    await Promise.all(
+      aTrianguler.map(async (ticket) => {
+        const contact = await recupererContactParent(ticket.parentPseudoId);
+        return [ticket.id, contact] as const;
       })
     )
   );
@@ -142,8 +165,8 @@ export default async function AssociationPage({
       <div>
         <h2 className="text-xl font-bold text-clairvoie-bleu">File de triangulation</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Rendez un verdict indépendant sur les signalements répondus ou
-          escaladés pour silence de l&apos;établissement.
+          Rendez un verdict indépendant sur les signalements contestés,
+          classés graves, ou escaladés pour silence de l&apos;établissement.
         </p>
       </div>
 
@@ -164,13 +187,56 @@ export default async function AssociationPage({
             </div>
             <p className="text-sm text-slate-600">{ticket.contenu}</p>
             <DateFaitsLigne ticket={ticket} />
-            {ticket.reponseContenu && (
+            {ticket.positionEtablissement && (
               <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                <p className="font-medium text-slate-700">Réponse de l&apos;établissement</p>
-                <p className="text-slate-600">{ticket.reponseContenu}</p>
+                <p className="font-medium text-slate-700">
+                  Position de l&apos;établissement :{" "}
+                  {ticket.positionEtablissement === "conteste" ? "contesté" : "non contesté"}
+                </p>
+                {ticket.reponseContenu && (
+                  <p className="mt-1 text-slate-600">{ticket.reponseContenu}</p>
+                )}
               </div>
             )}
             <PersonneMiseEnCauseCard personnes={personnesMiseEnCause.get(ticket.id) ?? []} />
+
+            <div className="grid gap-3 rounded-lg border border-slate-100 p-3 text-xs sm:grid-cols-2">
+              <div>
+                <p className="font-medium text-slate-600">Contacts de l&apos;établissement</p>
+                <ul className="mt-1 space-y-0.5 text-slate-500">
+                  {(contactsEtablissement.get(ticket.id) ?? []).map((c) => (
+                    <li key={c.id}>
+                      {LABEL_TYPE_CONTACT[c.type] ?? c.type} : {c.valeur}
+                      {c.porteur ? ` (${c.porteur})` : ""}
+                    </li>
+                  ))}
+                  {(contactsEtablissement.get(ticket.id) ?? []).length === 0 && (
+                    <li className="text-slate-400">Aucune coordonnée connue.</li>
+                  )}
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-slate-600">Contact du parent</p>
+                {contactsParent.get(ticket.id) ? (
+                  <ul className="mt-1 space-y-0.5 text-slate-500">
+                    <li>
+                      Email : {contactsParent.get(ticket.id)!.email}{" "}
+                      {contactsParent.get(ticket.id)!.emailVerifie ? "(vérifié)" : "(non vérifié)"}
+                    </li>
+                    {contactsParent.get(ticket.id)!.telephone && (
+                      <li>
+                        Téléphone : {contactsParent.get(ticket.id)!.telephone}{" "}
+                        {contactsParent.get(ticket.id)!.telephoneVerifie
+                          ? "(vérifié)"
+                          : "(non vérifié)"}
+                      </li>
+                    )}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-slate-400">Compte parent introuvable.</p>
+                )}
+              </div>
+            </div>
             <form
               action={`/api/signalement/${ticket.id}/trianguler`}
               method="post"

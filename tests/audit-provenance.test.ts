@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
-import {
-  creerSignalement,
-  repondreSignalement,
-  trianguler,
-  cloturerParAccordMutuel,
-} from "@/lib/tickets";
+import { creerSignalement, trianguler, cloturerParAccordMutuel } from "@/lib/tickets";
+import { enregistrerPosition } from "@/lib/positionEtablissement";
 
 describe("Principe 7 — provenance de chaque mise à jour", () => {
   let etablissementId: string;
@@ -41,10 +37,12 @@ describe("Principe 7 — provenance de chaque mise à jour", () => {
       gravite: "legere",
     });
 
-    await repondreSignalement({
+    await enregistrerPosition({
       ticketId: ticket.id,
       acteurPseudo: "etab-provenance",
-      reponseContenu: "Réponse de test",
+      role: "ETABLISSEMENT",
+      position: "non_conteste",
+      commentaire: "Réponse de test",
     });
 
     await cloturerParAccordMutuel({
@@ -59,7 +57,7 @@ describe("Principe 7 — provenance de chaque mise à jour", () => {
 
     expect(entries.map((e) => e.action)).toEqual([
       "creation",
-      "reponse",
+      "position_etablissement_non_conteste",
       "cloture_accord_mutuel",
     ]);
     expect(entries.every((e) => Boolean(e.acteurPseudo))).toBe(true);

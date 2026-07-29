@@ -325,6 +325,54 @@ Vérifié par `tests/test_volume_neutre_dans_le_score.test.ts`,
 `tests/test_suspension_badge_ticket_en_retard.test.ts` et
 `tests/test_badge_expire_sans_recalcul.test.ts`.
 
+## Prise de position établissement (accepter/contester)
+
+L'ancienne étape unique de "réponse" libre de l'établissement est remplacée
+par une prise de position structurée (`lib/positionEtablissement.ts` ->
+`enregistrerPosition`) : dans les temps, l'établissement indique s'il
+conteste ou non le signalement, avec un commentaire optionnel. Objectif :
+éviter que tout signalement non contesté passe systématiquement par
+l'association tierce (charge de travail inutile sur les cas simples), sans
+jamais permettre à l'établissement d'éteindre seul une affaire.
+
+Routage après enregistrement (une seule position possible par ticket,
+aucun changement rétroactif) :
+
+- `"conteste"` **ou** `gravite === "grave"` (quelle que soit la position) :
+  statut `"triangulation_requise"`, visible dans la file de l'association
+  tierce ;
+- `"non_conteste"` **et** gravité standard : statut
+  `"attente_cloture_parent"`. Un job périodique
+  (`verifierClotureParent`, même mécanisme que `escaladerSiSilence` mais
+  appliqué au silence du *parent*) transmet automatiquement le ticket au
+  rectorat (`"escaladé_rectorat"`) après `DELAI_CLOTURE_PARENT_JOURS`
+  (30 jours par défaut) sans clôture par le parent.
+
+Aucune fonction ne permet à l'établissement de clore un ticket par sa seule
+action : `enregistrerPosition` ne mène jamais à un statut de clôture
+(`clôturé_accord_mutuel`, `trianguléfondé`, `trianguléinfondé`) — seule
+`cloturerParAccordMutuel` (rôle PARENT, double validation) ou un verdict de
+l'association tierce (`trianguler`) le peuvent. La seule route API
+accessible au rôle ETABLISSEMENT est `/api/signalement/[id]/position`.
+
+Le délai "établissement" exposé par le tableau de bord public
+(`lib/dashboardStats.ts`) et par le classement d'exemplarité
+(`lib/exemplarite.ts`) reste, sans aucune modification de ces deux
+fichiers, celui déjà mesuré jusqu'à `reponduAt` — désormais toujours écrit
+au même instant que `positionEtablissementDate` par `enregistrerPosition`,
+et jamais retouché ensuite (triangulation, escalade, clôture). C'est ce qui
+fige définitivement ce délai au moment de la prise de position.
+
+Côté association tierce, la file de triangulation affiche désormais les
+coordonnées connues de l'établissement et du parent (celui-ci ayant
+obligatoirement vérifié son email et son téléphone à l'inscription), pour
+lui permettre de les recontacter dans le cadre de son évaluation.
+
+Vérifié par `tests/test_delai_fige_a_la_prise_de_position.test.ts`,
+`tests/test_gravite_grave_force_triangulation.test.ts`,
+`tests/test_non_conteste_sans_cloture_va_au_rectorat.test.ts` et
+`tests/test_etablissement_ne_peut_pas_clore_seul.test.ts`.
+
 ## Jeu de données de démonstration
 
 Le seed (`prisma/seed.ts`) génère :
@@ -435,9 +483,11 @@ prête pour la production :
    sinon cette étape est simplement ignorée, sans erreur.
 5. (Optionnel) Configurez un Vercel Cron Job pointant vers
    `/api/cron/escalade` pour déclencher automatiquement l'escalade des
-   signalements en silence, et un second vers `/api/cron/exemplarite` pour
+   signalements en silence, un second vers `/api/cron/exemplarite` pour
    recalculer les scores de reconnaissance des établissements/collectivités
-   exemplaires — voir la
+   exemplaires, et un troisième vers `/api/cron/cloture-parent` pour
+   transmettre au rectorat les signalements non contestés sans clôture du
+   parent — voir la
    [documentation Vercel Cron Jobs](https://vercel.com/docs/cron-jobs). Si
    vous définissez `CRON_SECRET` dans les variables d'environnement, protégez
    l'appel avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.

@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma";
 import { hashPassword } from "../lib/password";
 import { appendAuditLog } from "../lib/hashchain";
 import { escaladerSiSilence, declarerPlainteDirecte } from "../lib/tickets";
+import { verifierClotureParent } from "../lib/positionEtablissement";
 import { enregistrerPersonneMiseEnCause } from "../lib/personneMiseEnCause";
 import { deriverAcademie } from "../lib/academies";
 import { calculerScores, periodeCourante } from "../lib/exemplarite";
@@ -194,16 +195,18 @@ async function main() {
       categorie: "Violence verbale ou psychologique",
       contenu: "Propos humiliants tenus par un surveillant envers un élève.",
       gravite: "moderee",
-      statut: "répondu",
+      statut: "triangulation_requise",
       createdAt: daysAgo(20),
       receptionConfirmeeAt: receptionRapide(daysAgo(20)),
+      positionEtablissement: "conteste",
+      positionEtablissementDate: daysAgo(18),
       reponduAt: daysAgo(18),
       reponseContenu:
-        "Un entretien a été mené avec le membre du personnel concerné et un rappel des règles a été effectué.",
+        "L'établissement conteste les propos tels que rapportés et souhaite un examen indépendant du dossier.",
     },
   });
   await log(t2.id, "creation", p3);
-  await log(t2.id, "reponse", "etab-demo-1");
+  await log(t2.id, "position_etablissement_conteste", "etab-demo-1");
 
   // T3 — escaladé pour silence
   const t3 = await prisma.ticket.create({
@@ -235,6 +238,8 @@ async function main() {
       statut: "clôturé_accord_mutuel",
       createdAt: daysAgo(3),
       receptionConfirmeeAt: receptionRapide(daysAgo(3)),
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(2),
       reponduAt: daysAgo(2),
       reponseContenu: "Médiation organisée entre les élèves concernés, situation apaisée.",
       clotureAt: hoursAgo(1),
@@ -242,7 +247,7 @@ async function main() {
     },
   });
   await log(t4.id, "creation", p1);
-  await log(t4.id, "reponse", "etab-demo-1");
+  await log(t4.id, "position_etablissement_non_conteste", "etab-demo-1");
   await log(t4.id, "cloture_accord_mutuel", p1);
 
   // T5 — clôturé par accord mutuel, fenêtre de rétractation dépassée
@@ -256,6 +261,8 @@ async function main() {
       statut: "clôturé_accord_mutuel",
       createdAt: daysAgo(20),
       receptionConfirmeeAt: receptionRapide(daysAgo(20)),
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(19),
       reponduAt: daysAgo(19),
       reponseContenu: "Renforcement de la surveillance des couloirs mis en place.",
       clotureAt: daysAgo(15),
@@ -263,7 +270,7 @@ async function main() {
     },
   });
   await log(t5.id, "creation", p4);
-  await log(t5.id, "reponse", "etab-demo-1");
+  await log(t5.id, "position_etablissement_non_conteste", "etab-demo-1");
   await log(t5.id, "cloture_accord_mutuel", p4);
 
   // T6 — grave, trianguléfondé, avec suite judiciaire déclarée
@@ -279,6 +286,11 @@ async function main() {
       receptionConfirmeeAt: receptionRapide(daysAgo(25)),
       dateFaits: daysAgo(25),
       horaireFaits: "Pause méridienne, cour de récréation",
+      // Non contesté par l'établissement, mais gravite "grave" : passe tout
+      // de même par la triangulation de l'association tierce (voir
+      // lib/positionEtablissement.ts -> enregistrerPosition).
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(24),
       reponduAt: daysAgo(24),
       reponseContenu: "Le personnel concerné a été suspendu dans l'attente des conclusions.",
       verdict: "fondé",
@@ -286,7 +298,7 @@ async function main() {
     },
   });
   await log(t6.id, "creation", p2);
-  await log(t6.id, "reponse", "etab-demo-1");
+  await log(t6.id, "position_etablissement_non_conteste", "etab-demo-1");
   await log(t6.id, "verdict_fondé", "asso-demo-1");
   await prisma.suiteJudiciaire.create({ data: { ticketId: t6.id, statut: "transmis" } });
   await log(t6.id, "suite_judiciaire_declaree", p2);
@@ -330,15 +342,17 @@ async function main() {
       categorie: "Violence verbale ou psychologique",
       contenu: "Remarques dévalorisantes répétées d'un enseignant envers un élève.",
       gravite: "moderee",
-      statut: "répondu",
+      statut: "attente_cloture_parent",
       createdAt: daysAgo(10),
       receptionConfirmeeAt: receptionRapide(daysAgo(10)),
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(9),
       reponduAt: daysAgo(9),
       reponseContenu: "Un rappel des obligations déontologiques a été fait à l'enseignant concerné.",
     },
   });
   await log(t8.id, "creation", p1);
-  await log(t8.id, "reponse", "etab-demo-1");
+  await log(t8.id, "position_etablissement_non_conteste", "etab-demo-1");
 
   // T9 — ouvert, très récent (pour la démo du compte établissement)
   const t9 = await prisma.ticket.create({
@@ -366,6 +380,8 @@ async function main() {
       statut: "trianguléinfondé",
       createdAt: daysAgo(30),
       receptionConfirmeeAt: receptionRapide(daysAgo(30)),
+      positionEtablissement: "conteste",
+      positionEtablissementDate: daysAgo(29),
       reponduAt: daysAgo(29),
       reponseContenu: "Enquête interne menée, versions contradictoires recueillies.",
       verdict: "infondé",
@@ -373,7 +389,7 @@ async function main() {
     },
   });
   await log(t10.id, "creation", p5);
-  await log(t10.id, "reponse", "etab-demo-1");
+  await log(t10.id, "position_etablissement_conteste", "etab-demo-1");
   await log(t10.id, "verdict_infondé", "asso-demo-1");
 
   // T11 — escaladé pour silence
@@ -417,6 +433,8 @@ async function main() {
       statut: "clôturé_accord_mutuel",
       createdAt: daysAgo(40),
       receptionConfirmeeAt: receptionRapide(daysAgo(40)),
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(39),
       reponduAt: daysAgo(39),
       reponseContenu: "Excuses formelles présentées à la famille.",
       clotureAt: daysAgo(35),
@@ -424,7 +442,7 @@ async function main() {
     },
   });
   await log(t12.id, "creation", p3);
-  await log(t12.id, "reponse", "etab-demo-1");
+  await log(t12.id, "position_etablissement_non_conteste", "etab-demo-1");
   await log(t12.id, "cloture_accord_mutuel", p3);
   await prisma.suiteJudiciaire.create({ data: { ticketId: t12.id, statut: "sans_nouvelle" } });
   await log(t12.id, "suite_judiciaire_declaree", p3);
@@ -444,7 +462,10 @@ async function main() {
   });
   await log(t13.id, "creation", p4);
 
-  // T14 — répondu dans les délais
+  // T14 — non contesté, mais le parent n'a pas clôturé après le délai :
+  // sera transmis automatiquement au rectorat par le job périodique plus
+  // bas (verifierClotureParent), même mécanisme que l'escalade pour
+  // silence total de l'établissement (T13).
   const t14 = await prisma.ticket.create({
     data: {
       parentPseudoId: p5,
@@ -452,15 +473,17 @@ async function main() {
       categorie: "Violence verbale ou psychologique",
       contenu: "Cris et propos rabaissants tenus envers plusieurs élèves.",
       gravite: "legere",
-      statut: "répondu",
-      createdAt: daysAgo(8),
-      receptionConfirmeeAt: receptionRapide(daysAgo(8)),
-      reponduAt: daysAgo(7),
+      statut: "attente_cloture_parent",
+      createdAt: daysAgo(40),
+      receptionConfirmeeAt: receptionRapide(daysAgo(40)),
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(35),
+      reponduAt: daysAgo(35),
       reponseContenu: "Un accompagnement pédagogique a été mis en place.",
     },
   });
   await log(t14.id, "creation", p5);
-  await log(t14.id, "reponse", "etab-demo-1");
+  await log(t14.id, "position_etablissement_non_conteste", "etab-demo-1");
 
   // T15 — grave, ouvert, avec suite judiciaire déjà déclarée par le parent
   const t15 = await prisma.ticket.create({
@@ -508,6 +531,12 @@ async function main() {
   console.log("Exécution de l'escalade automatique (cron) pour les signalements en silence…");
   const escalades = await escaladerSiSilence();
   console.log(`  -> ${escalades.length} signalement(s) escaladé(s) automatiquement.`);
+
+  console.log(
+    "Exécution de la vérification de clôture parent (cron) pour les signalements non contestés…"
+  );
+  const transmisRectorat = await verifierClotureParent();
+  console.log(`  -> ${transmisRectorat.length} signalement(s) transmis automatiquement au rectorat.`);
 
   console.log("Calcul des scores d'exemplarité (job périodique)…");
   const nombreScores = await calculerScores(periodeCourante());

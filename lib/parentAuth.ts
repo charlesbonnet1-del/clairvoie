@@ -53,6 +53,31 @@ export async function inscrireParent(params: {
   return { identityId: identity.id, codeEmail, codeTelephone };
 }
 
+/**
+ * Coordonnées du parent auteur d'un signalement précis, scopées à un seul
+ * pseudoId — jamais une recherche/liste (pas d'index ni de fonction de
+ * recherche par nom exposés ici). Destinée à l'association tierce pour
+ * pouvoir recontacter le parent dans le cadre de l'évaluation d'un
+ * signalement qu'elle traite déjà — c'est précisément pour permettre ce
+ * contact que l'email et le téléphone du parent sont vérifiés obligatoirement
+ * à l'inscription (voir inscrireParent ci-dessus).
+ */
+export async function recupererContactParent(parentPseudoId: string): Promise<{
+  email: string;
+  telephone: string | null;
+  emailVerifie: boolean;
+  telephoneVerifie: boolean;
+} | null> {
+  const identity = await prisma.identity.findUnique({ where: { pseudoId: parentPseudoId } });
+  if (!identity) return null;
+  return {
+    email: identity.email,
+    telephone: identity.telephone,
+    emailVerifie: identity.emailVerifie,
+    telephoneVerifie: identity.telephoneVerifie,
+  };
+}
+
 export async function verifierCodeContact(params: {
   identityId: string;
   canal: "email" | "telephone";

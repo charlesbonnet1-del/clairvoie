@@ -155,9 +155,13 @@ model Ticket {
   contenu         String // en clair pour le MVP ; chiffrement par enregistrement en phase 2
   // "legere" | "moderee" | "grave" — jamais auto-déclarée par le parent,
   // dérivée automatiquement de `categorie` (config.ts -> CATEGORIE_GRAVITE).
+  // Un ticket "grave" passe systématiquement par la triangulation de
+  // l'association tierce, quelle que soit positionEtablissement ci-dessous
+  // (lib/positionEtablissement.ts -> enregistrerPosition).
   gravite         String
   statut          String   @default("ouvert")
-  // "ouvert" | "verification_contact_requise" | "répondu" | "escaladé" |
+  // "ouvert" | "verification_contact_requise" | "triangulation_requise" |
+  // "attente_cloture_parent" | "escaladé" | "escaladé_rectorat" |
   // "trianguléfondé" | "trianguléinfondé" | "clôturé_accord_mutuel"
 
   // Horodatage de la première tentative de contact automatisée ayant
@@ -172,6 +176,25 @@ model Ticket {
   dateFaits    DateTime?
   horaireFaits String? // moment approximatif, ex. "14h30", "pendant la récréation du matin"
 
+  // Prise de position structurée de l'établissement — remplace l'ancienne
+  // étape unique de "réponse" libre. "conteste" | "non_conteste" | null tant
+  // que non renseignée. Un seul enregistrement possible : aucun changement
+  // rétroactif sans procédure de contestation dédiée, tracée séparément
+  // (lib/positionEtablissement.ts -> enregistrerPosition).
+  positionEtablissement     String?
+  // Fige définitivement le délai "établissement" exposé dans les
+  // statistiques publiques (lib/dashboardStats.ts, lib/exemplarite.ts, qui
+  // continuent de lire `reponduAt`, toujours écrit au même instant par
+  // enregistrerPosition) : ce qui se passe ensuite dans le dossier
+  // (triangulation, escalade, clôture) ne le modifie jamais.
+  positionEtablissementDate DateTime?
+
+  // Commentaire libre optionnel accompagnant la prise de position
+  // ci-dessus (ex. justification d'une contestation, mesure prise en cas
+  // de non-contestation). reponduAt est toujours écrit au même instant que
+  // positionEtablissementDate — conservé pour ne pas dupliquer le calcul du
+  // délai "établissement" déjà en place dans lib/dashboardStats.ts et
+  // lib/exemplarite.ts.
   reponseContenu  String?
   reponduAt       DateTime?
   escaladeAt      DateTime?

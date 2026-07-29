@@ -13,14 +13,20 @@ body {
 .badge-ouvert {
   @apply bg-slate-200 text-slate-700;
 }
-.badge-répondu {
+.badge-triangulation_requise {
   @apply bg-blue-100 text-blue-700;
+}
+.badge-attente_cloture_parent {
+  @apply bg-teal-100 text-teal-700;
 }
 .badge-verification_contact_requise {
   @apply bg-purple-100 text-purple-700;
 }
 .badge-escaladé {
   @apply bg-amber-100 text-amber-800;
+}
+.badge-escaladé_rectorat {
+  @apply bg-orange-100 text-orange-800;
 }
 .badge-trianguléfondé {
   @apply bg-red-100 text-red-700;

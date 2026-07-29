@@ -100,34 +100,54 @@ export default async function EtablissementPage({
 
             <PersonneMiseEnCauseCard personnes={personnesMiseEnCause.get(ticket.id) ?? []} />
 
-            {ticket.statut === "ouvert" && ticket.receptionConfirmeeAt && (
+            {ticket.statut === "ouvert" && ticket.receptionConfirmeeAt && !ticket.positionEtablissement && (
               <>
                 <p className="text-xs font-medium text-amber-700">
                   {delaiRestant(ticket.receptionConfirmeeAt)}
                 </p>
                 <form
-                  action={`/api/signalement/${ticket.id}/repondre`}
+                  action={`/api/signalement/${ticket.id}/position`}
                   method="post"
                   className="space-y-2 border-t border-slate-100 pt-3"
                 >
+                  <p className="label">Prise de position</p>
+                  <div className="flex gap-4 text-sm text-slate-700">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="position" value="non_conteste" required />
+                      Je ne conteste pas ce signalement
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="position" value="conteste" required />
+                      Je conteste ce signalement
+                    </label>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {ticket.gravite === "grave"
+                      ? "Signalement classé grave : quelle que soit votre position, il sera transmis à l'association tierce pour triangulation."
+                      : "Ne pas contester ne clôture pas le dossier seul : le parent doit encore confirmer la clôture, sans quoi le signalement est transmis au rectorat."}
+                  </p>
                   <textarea
                     className="input"
-                    name="reponseContenu"
+                    name="commentaire"
                     rows={3}
-                    required
-                    placeholder="Votre réponse au signalement…"
+                    placeholder="Commentaire (optionnel) : justification, mesure prise…"
                   />
                   <button type="submit" className="btn btn-primary text-xs">
-                    Envoyer la réponse
+                    Enregistrer ma position
                   </button>
                 </form>
               </>
             )}
 
-            {ticket.reponseContenu && (
+            {ticket.positionEtablissement && (
               <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                <p className="font-medium text-slate-700">Votre réponse</p>
-                <p className="text-slate-600">{ticket.reponseContenu}</p>
+                <p className="font-medium text-slate-700">
+                  Votre position :{" "}
+                  {ticket.positionEtablissement === "conteste" ? "contesté" : "non contesté"}
+                </p>
+                {ticket.reponseContenu && (
+                  <p className="mt-1 text-slate-600">{ticket.reponseContenu}</p>
+                )}
               </div>
             )}
           </div>

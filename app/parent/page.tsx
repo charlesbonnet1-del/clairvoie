@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { STATUTS_SUITE_JUDICIAIRE } from "@/config";
+import { STATUTS_SUITE_JUDICIAIRE, DELAI_CLOTURE_PARENT_JOURS } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
 import DateFaitsLigne from "@/components/DateFaitsLigne";
 import PlainteDirecteForm from "@/components/PlainteDirecteForm";
@@ -65,7 +65,7 @@ export default async function ParentPage({
             ticket.clotureRevocableJusqua > new Date();
           const peutCloturer =
             ticket.gravite !== "grave" &&
-            ["ouvert", "répondu"].includes(ticket.statut);
+            ["ouvert", "attente_cloture_parent"].includes(ticket.statut);
           const plainteDirecteDeclaree = ticket.suitesJudiciaires.find(
             (s) => s.origine === "plainte_directe_parent" || s.origine === "les_deux"
           );
@@ -87,15 +87,30 @@ export default async function ParentPage({
               <p className="text-sm text-slate-600">{ticket.contenu}</p>
               <DateFaitsLigne ticket={ticket} />
 
-              {ticket.reponseContenu && (
+              {ticket.positionEtablissement && (
                 <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                  <p className="font-medium text-slate-700">Réponse de l&apos;établissement</p>
-                  <p className="text-slate-600">{ticket.reponseContenu}</p>
+                  <p className="font-medium text-slate-700">
+                    Position de l&apos;établissement :{" "}
+                    {ticket.positionEtablissement === "conteste" ? "contesté" : "non contesté"}
+                  </p>
+                  {ticket.reponseContenu && (
+                    <p className="mt-1 text-slate-600">{ticket.reponseContenu}</p>
+                  )}
                 </div>
               )}
 
+              {ticket.statut === "attente_cloture_parent" && (
+                <p className="text-xs text-teal-700">
+                  L&apos;établissement n&apos;a pas contesté ce signalement. Confirmez la
+                  clôture ci-dessous, sans quoi il sera transmis automatiquement au
+                  rectorat après {DELAI_CLOTURE_PARENT_JOURS} jours sans action de votre part.
+                </p>
+              )}
+
               {ticket.gravite === "grave" &&
-                ["ouvert", "répondu", "escaladé"].includes(ticket.statut) && (
+                ["ouvert", "triangulation_requise", "escaladé", "escaladé_rectorat"].includes(
+                  ticket.statut
+                ) && (
                   <p className="text-xs text-amber-700">
                     Signalement classé grave : la clôture ne peut se faire que
                     par validation de l&apos;association tierce, pas par

@@ -33,32 +33,6 @@ export async function creerSignalement(params: {
   return ticket;
 }
 
-export async function repondreSignalement(params: {
-  ticketId: string;
-  acteurPseudo: string;
-  reponseContenu: string;
-}) {
-  const ticket = await prisma.ticket.findUnique({ where: { id: params.ticketId } });
-  if (!ticket) throw new RegleMetierError("Signalement introuvable.");
-  if (ticket.statut !== "ouvert") {
-    throw new RegleMetierError("Ce signalement a déjà reçu une réponse ou a été escaladé.");
-  }
-  const updated = await prisma.ticket.update({
-    where: { id: params.ticketId },
-    data: {
-      statut: "répondu",
-      reponseContenu: params.reponseContenu,
-      reponduAt: new Date(),
-    },
-  });
-  await appendAuditLog({
-    ticketId: params.ticketId,
-    action: "reponse",
-    acteurPseudo: params.acteurPseudo,
-  });
-  return updated;
-}
-
 /**
  * Escalade automatiquement (silence de l'établissement) les tickets ouverts
  * depuis plus de RESPONSE_DEADLINE_HOURS sans réponse. Appelé par le cron.

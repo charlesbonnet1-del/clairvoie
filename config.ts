@@ -130,12 +130,20 @@ export function deriverGraviteDepuisCategorie(categorie: string): Gravite {
 
 /** Statuts valides pour un ticket. "verification_contact_requise" est
  * distinct de "escaladé" : ce n'est pas un silence de l'établissement, c'est
- * l'impossibilité de lui délivrer le signalement par un canal vérifié. */
+ * l'impossibilité de lui délivrer le signalement par un canal vérifié.
+ * "escaladé" (silence total de l'établissement, avant toute prise de
+ * position — lib/tickets.ts -> escaladerSiSilence) est lui aussi distinct
+ * de "escaladé_rectorat" (l'établissement a pris position "non_conteste"
+ * dans les temps, mais le parent n'a pas clôturé après
+ * DELAI_CLOTURE_PARENT_JOURS — lib/positionEtablissement.ts ->
+ * verifierClotureParent) : ce n'est jamais imputable à l'établissement. */
 export const STATUTS_TICKET = [
   "ouvert",
   "verification_contact_requise",
-  "répondu",
+  "triangulation_requise",
+  "attente_cloture_parent",
   "escaladé",
+  "escaladé_rectorat",
   "trianguléfondé",
   "trianguléinfondé",
   "clôturé_accord_mutuel",
@@ -145,6 +153,19 @@ export type StatutTicket = (typeof STATUTS_TICKET)[number];
 /** Verdicts possibles rendus par l'association tierce. */
 export const VERDICTS = ["fondé", "à_investiguer", "infondé"] as const;
 export type Verdict = (typeof VERDICTS)[number];
+
+/** Prise de position structurée de l'établissement sur un signalement —
+ * remplace l'ancienne étape unique de "réponse" libre. Voir
+ * lib/positionEtablissement.ts -> enregistrerPosition. */
+export const POSITIONS_ETABLISSEMENT = ["conteste", "non_conteste"] as const;
+export type PositionEtablissement = (typeof POSITIONS_ETABLISSEMENT)[number];
+
+/** Délai laissé au parent pour clôturer par accord mutuel un signalement non
+ * contesté (statut "attente_cloture_parent") avant transmission automatique
+ * au rectorat (statut "escaladé_rectorat") — même mécanisme que
+ * RESPONSE_DEADLINE_HOURS / escaladerSiSilence, appliqué ici au silence du
+ * parent plutôt qu'à celui de l'établissement. */
+export const DELAI_CLOTURE_PARENT_JOURS = 30;
 
 /** Statuts possibles d'une suite judiciaire auto-déclarée par le parent. */
 export const STATUTS_SUITE_JUDICIAIRE = [
