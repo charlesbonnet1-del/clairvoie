@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { appendAuditLog } from "./hashchain";
 import { RegleMetierError } from "./tickets";
+import { getContactEscalade } from "./rectoratContacts";
 import { DELAI_CLOTURE_PARENT_JOURS, type PositionEtablissement } from "@/config";
 
 /**
@@ -104,6 +105,7 @@ export async function verifierClotureParent(acteurPseudo = "system:cron") {
   const seuil = new Date(Date.now() - DELAI_CLOTURE_PARENT_JOURS * 24 * 60 * 60 * 1000);
   const aTransmettre = await prisma.ticket.findMany({
     where: { statut: "attente_cloture_parent", positionEtablissementDate: { lt: seuil } },
+    include: { etablissement: { include: { commune: true } } },
   });
 
   const transmis = [];
@@ -117,6 +119,17 @@ export async function verifierClotureParent(acteurPseudo = "system:cron") {
       action: "escalade_silence_parent",
       acteurPseudo,
     });
+
+    // Même contrainte que lib/tickets.ts -> escaladerSiSilence : le
+    // destinataire est résolu par une simple lecture de la table locale des
+    // contacts rectorat (lib/rectoratContacts.ts), jamais un appel réseau.
+    const contact = await getContactEscalade(ticket.etablissement.commune.academie);
+    await appendAuditLog({
+      ticketId: ticket.id,
+      action: contact ? `escalade_contact_${contact.typeUtilise}` : "escalade_contact_introuvable",
+      acteurPseudo: "system:rectoratContacts",
+    });
+
     transmis.push(updated);
   }
   return transmis;

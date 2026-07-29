@@ -80,6 +80,7 @@ Mot de passe identique pour tous les comptes : **`demo1234`**
 | Établissement | `etablissement@demo.clairvoie` | Réponse aux signalements reçus (Lycée Victor Hugo) |
 | Association tierce | `association@demo.clairvoie` | Triangulation et verdicts |
 | Rectorat | `rectorat@demo.clairvoie` | Signalements escaladés |
+| Admin | `admin@demo.clairvoie` | Annuaire des contacts rectorat |
 
 Le tableau de bord public (`/dashboard`) ne nécessite aucune authentification.
 
@@ -435,6 +436,60 @@ Vérifié par `tests/test_signalement_dormance_ne_modifie_pas_statut.test.ts`,
 `tests/test_delai_plancher_dormance.test.ts`,
 `tests/test_sans_nouvelle_jamais_resolu.test.ts` et
 `tests/test_seule_association_fait_evoluer_statut.test.ts`.
+
+## Annuaire des contacts rectorat (maintenance manuelle, pas d'API live)
+
+À ne pas confondre avec `ContactCanal` (coordonnées d'établissement, 66 000+
+entités, intégration API + cache) : les contacts des 30 rectorats/académies
+sont gérés par une table dédiée, `RectoratContact`
+(`lib/rectoratContacts.ts`), **maintenue manuellement plutôt qu'intégrée à
+une API**. À cette échelle (30 entités), une vérification manuelle
+périodique est plus fiable qu'une dépendance API — et l'enjeu d'un mauvais
+contact y est plus grave, puisque c'est le point de sortie de toute la
+chaîne d'escalade automatique déjà construite (`escaladerSiSilence`,
+`verifierClotureParent`).
+
+- **`seedRectoratContacts`** : script d'amorçage à exécuter une seule fois
+  (pas un job périodique) à partir d'un jeu de données externe (typiquement
+  le jeu MESRI « Rectorats d'académies et vice-rectorats », qui ne sert
+  qu'à l'amorçage initial, jamais de source de vérité continue — sa
+  fraîcheur réelle n'est pas garantie). Toute entrée créée reste
+  `statutVerification = "a_verifier"`, jamais `"verifie"` par défaut. Le
+  jeu utilisé par `prisma/seed.ts` (30 académies réelles, coordonnées
+  fictives en domaine `-demo.fr`) est un jeu de démonstration, pas un
+  import réel du jeu MESRI.
+- **`getContactEscalade(academie)`** : seul point de résolution d'un
+  contact pour une escalade en cours — toujours une lecture de la table
+  locale, **jamais un appel réseau synchrone dans le chemin critique de
+  l'escalade**. Ordre de préférence : médiateur académique (si renseigné
+  et la fiche vérifiée) → secrétariat général (si renseigné et vérifié) →
+  standard du rectorat en dernier recours (toujours disponible). Une fiche
+  `"obsolete_suspecte"` n'est jamais utilisée pour le médiateur/secrétariat
+  mais reste retournée via le standard, toujours accompagnée d'un
+  avertissement explicite.
+- **`marquerVerifie`** : interface d'administration simple (pas de workflow
+  automatisé) permettant à un opérateur de confirmer ou corriger les
+  coordonnées d'une académie, avec horodatage de la vérification.
+- **`signalerEchecContact`** : si une tentative d'escalade réelle échoue,
+  marque automatiquement l'entrée `"obsolete_suspecte"` et journalise à
+  l'intention d'un administrateur — ne corrige **jamais** la donnée
+  automatiquement, ne fait que déclencher la vérification manuelle.
+- **Alerte de péremption** : toute entrée non revérifiée depuis plus de
+  `RECTORAT_REVERIFICATION_MOIS` (6 mois par défaut) apparaît dans le
+  tableau de bord d'administration (`admin/rectorats`, rôle `ADMIN`
+  exclusivement) comme à re-vérifier — jamais bloquant pour une escalade en
+  cours, seulement visible côté administration.
+
+`escaladerSiSilence` et `verifierClotureParent` résolvent chacun le contact
+via `getContactEscalade` au moment de l'escalade et journalisent le type de
+contact retenu (ou son absence) dans le journal d'audit du ticket — aucune
+notification réelle n'est envoyée dans ce MVP.
+
+Vérifié par `tests/test_seed_statut_a_verifier.test.ts`,
+`tests/test_ordre_preference_contact.test.ts`,
+`tests/test_echec_contact_marque_obsolete.test.ts`,
+`tests/test_escalade_lecture_locale_uniquement.test.ts` et
+`tests/test_alerte_peremption_6_mois.test.ts`.
 
 ## Jeu de données de démonstration
 

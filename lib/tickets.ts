@@ -1,8 +1,10 @@
 import { prisma } from "./prisma";
 import { appendAuditLog } from "./hashchain";
+import { getContactEscalade } from "./rectoratContacts";
+import { RegleMetierError } from "./errors";
 import { RESPONSE_DEADLINE_HOURS, RETRACTION_WINDOW_HOURS } from "@/config";
 
-export class RegleMetierError extends Error {}
+export { RegleMetierError };
 
 export async function creerSignalement(params: {
   parentPseudoId: string;
@@ -41,11 +43,19 @@ export async function creerSignalement(params: {
  * tant qu'aucun canal de contact n'a été confirmé, le ticket ne relève pas
  * du silence de l'établissement mais du parcours de vérification de contact
  * (voir lib/contactVerification.ts -> evaluerEchecsGracePeriod).
+ *
+ * Le destinataire de l'escalade est déterminé via getContactEscalade
+ * (lib/rectoratContacts.ts) — une simple lecture de la table locale des
+ * contacts rectorat, jamais un appel réseau synchrone dans ce chemin
+ * critique. Le type de contact effectivement résolu (ou son absence) est
+ * uniquement journalisé ici ; aucune tentative de notification réelle n'est
+ * envoyée dans ce MVP.
  */
 export async function escaladerSiSilence(acteurPseudo = "system:cron") {
   const seuil = new Date(Date.now() - RESPONSE_DEADLINE_HOURS * 60 * 60 * 1000);
   const aEscalader = await prisma.ticket.findMany({
     where: { statut: "ouvert", receptionConfirmeeAt: { not: null, lt: seuil } },
+    include: { etablissement: { include: { commune: true } } },
   });
 
   const escalades = [];
@@ -59,6 +69,14 @@ export async function escaladerSiSilence(acteurPseudo = "system:cron") {
       action: "escalade_silence",
       acteurPseudo,
     });
+
+    const contact = await getContactEscalade(ticket.etablissement.commune.academie);
+    await appendAuditLog({
+      ticketId: ticket.id,
+      action: contact ? `escalade_contact_${contact.typeUtilise}` : "escalade_contact_introuvable",
+      acteurPseudo: "system:rectoratContacts",
+    });
+
     escalades.push(updated);
   }
   return escalades;

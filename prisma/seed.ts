@@ -7,6 +7,65 @@ import { signalerDormance, traiterRelance } from "../lib/dormance";
 import { enregistrerPersonneMiseEnCause } from "../lib/personneMiseEnCause";
 import { deriverAcademie } from "../lib/academies";
 import { calculerScores, periodeCourante } from "../lib/exemplarite";
+import {
+  seedRectoratContacts,
+  marquerVerifie,
+  type DonneesRectoratSeed,
+} from "../lib/rectoratContacts";
+
+// Liste des 30 académies françaises (noms réels), avec des coordonnées de
+// contact FICTIVES (domaine "-demo.fr", clairement identifiable comme tel)
+// tenant lieu d'amorçage pour la démo — PAS un import réel du jeu de données
+// MESRI "Rectorats d'académies et vice-rectorats" (aucun accès réseau à ce
+// jeu de données n'a été effectué pour générer cette liste). En production,
+// ces 30 lignes seraient remplacées par le résultat d'un import réel unique
+// (voir lib/rectoratContacts.ts -> seedRectoratContacts), toujours avec
+// statutVerification = "a_verifier" au départ, jamais "verifie" par défaut.
+const ACADEMIES_DEMO: Array<[nom: string, slug: string]> = [
+  ["Académie d'Aix-Marseille", "aix-marseille"],
+  ["Académie d'Amiens", "amiens"],
+  ["Académie de Besançon", "besancon"],
+  ["Académie de Bordeaux", "bordeaux"],
+  ["Académie de Clermont-Ferrand", "clermont"],
+  ["Académie de Corse", "corse"],
+  ["Académie de Créteil", "creteil"],
+  ["Académie de Dijon", "dijon"],
+  ["Académie de Grenoble", "grenoble"],
+  ["Académie de Guadeloupe", "guadeloupe"],
+  ["Académie de Guyane", "guyane"],
+  ["Académie de Lille", "lille"],
+  ["Académie de Limoges", "limoges"],
+  ["Académie de Lyon", "lyon"],
+  ["Académie de Martinique", "martinique"],
+  ["Académie de Mayotte", "mayotte"],
+  ["Académie de Montpellier", "montpellier"],
+  ["Académie de Nancy-Metz", "nancy-metz"],
+  ["Académie de Nantes", "nantes"],
+  ["Académie de Nice", "nice"],
+  ["Académie de Normandie", "normandie"],
+  ["Académie d'Orléans-Tours", "orleans-tours"],
+  ["Académie de Paris", "paris"],
+  ["Académie de Poitiers", "poitiers"],
+  ["Académie de Reims", "reims"],
+  ["Académie de Rennes", "rennes"],
+  ["Académie de La Réunion", "reunion"],
+  ["Académie de Strasbourg", "strasbourg"],
+  ["Académie de Toulouse", "toulouse"],
+  ["Académie de Versailles", "versailles"],
+  // Repli technique utilisé par lib/academies.ts pour tout département hors
+  // de la table de correspondance de la démo — pas une académie réelle.
+  ["Académie inconnue", "inconnue"],
+];
+
+const DONNEES_RECTORAT_DEMO: DonneesRectoratSeed[] = ACADEMIES_DEMO.map(([academie, slug]) => ({
+  academie,
+  mediateurEmail: `mediateur@ac-${slug}.demo.fr`,
+  mediateurTelephone: null,
+  secretariatEmail: `secretariat-general@ac-${slug}.demo.fr`,
+  secretariatTelephone: null,
+  standardTelephone: "01 00 00 00 00",
+  standardAdresse: `Rectorat, ${academie.replace(/^Académie (d'|de |des |du )?/, "")}`,
+}));
 
 function daysAgo(days: number, hours = 0): Date {
   return new Date(Date.now() - (days * 24 + hours) * 60 * 60 * 1000);
@@ -32,6 +91,7 @@ async function main() {
   console.log("Nettoyage de la base…");
   await prisma.auditLog.deleteMany();
   await prisma.exemplariteScore.deleteMany();
+  await prisma.rectoratContact.deleteMany();
   await prisma.signalementDormance.deleteMany();
   await prisma.suiteJudiciaire.deleteMany();
   await prisma.tentativeContact.deleteMany();
@@ -122,6 +182,21 @@ async function main() {
     },
   });
 
+  console.log("Amorçage de l'annuaire des contacts rectorat (30 académies)…");
+  const nombreRectoratsAmorces = await seedRectoratContacts(DONNEES_RECTORAT_DEMO);
+  console.log(`  -> ${nombreRectoratsAmorces} fiche(s) de contact rectorat créée(s), toutes "a_verifier".`);
+  // Démo de la vérification manuelle (lib/rectoratContacts.ts ->
+  // marquerVerifie) : seules les académies effectivement mobilisées par le
+  // jeu de données de démo (Grenoble, Lyon) sont vérifiées, pour illustrer
+  // getContactEscalade choisissant le médiateur académique une fois la
+  // fiche confirmée. Les 28 autres restent "a_verifier", à l'image d'un
+  // annuaire réel dont la vérification est encore en cours.
+  await marquerVerifie({
+    academie: "Académie de Grenoble",
+    compteAdminId: "admin-demo-1",
+    champsMisAJour: { typeContactPrefere: "mediateur_academique" },
+  });
+
   console.log("Création des comptes de démo…");
   const passwordHash = await hashPassword("demo1234");
 
@@ -162,6 +237,15 @@ async function main() {
       role: "RECTORAT",
       displayName: "Rectorat de démonstration",
       email: "rectorat@demo.clairvoie",
+      passwordHash,
+    },
+  });
+  await prisma.identity.create({
+    data: {
+      pseudoId: "admin-demo-1",
+      role: "ADMIN",
+      displayName: "Administration Clairvoie",
+      email: "admin@demo.clairvoie",
       passwordHash,
     },
   });

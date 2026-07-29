@@ -342,3 +342,36 @@ model SignalementDormance {
   relanceEffectuee Boolean   @default(false)
   resultatRelance  String? // "reponse_obtenue" | "sans_nouvelle" | null tant que non traité
 }
+
+// ---------------------------------------------------------------------------
+// Contact rectorat/académie — table MAINTENUE MANUELLEMENT, jamais une
+// intégration API automatisée : à 30 entités (contre 66 000+ établissements,
+// voir ContactCanal), une vérification manuelle périodique est plus fiable
+// qu'une dépendance API, et l'enjeu d'un mauvais contact ici est plus grave
+// puisque c'est le point de sortie de toute la chaîne d'escalade automatique
+// (lib/tickets.ts -> escaladerSiSilence, lib/positionEtablissement.ts ->
+// verifierClotureParent). Le jeu de données MESRI ("Rectorats d'académies et
+// vice-rectorats") ne sert qu'à l'amorçage initial (lib/rectoratContacts.ts
+// -> seedRectoratContacts, exécuté une seule fois, jamais un job périodique)
+// — sa fraîcheur n'est jamais présumée : statutVerification démarre
+// systématiquement à "a_verifier".
+//
+// Seul point d'accès en lecture pour une escalade en cours :
+// lib/rectoratContacts.ts -> getContactEscalade, qui ne fait qu'une lecture
+// de cette table locale, jamais un appel réseau synchrone dans le chemin
+// critique de l'escalade.
+// ---------------------------------------------------------------------------
+model RectoratContact {
+  id                   String    @id @default(cuid())
+  academie             String    @unique
+  typeContactPrefere   String // "mediateur_academique" | "secretariat_general" | "standard_rectorat"
+  medieurEmail         String?
+  medieurTelephone     String?
+  secretariatEmail     String?
+  secretariatTelephone String?
+  standardTelephone    String?
+  standardAdresse      String?
+  source               String // "mesri_seed" | "verification_manuelle"
+  derniereVerification DateTime?
+  statutVerification   String // "a_verifier" | "verifie" | "obsolete_suspecte"
+}

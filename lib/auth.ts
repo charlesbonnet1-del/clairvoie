@@ -46,6 +46,8 @@ export function roleHome(role: string): string {
       return "/association";
     case "RECTORAT":
       return "/rectorat";
+    case "ADMIN":
+      return "/admin/rectorats";
     default:
       return "/dashboard";
   }

@@ -181,6 +181,39 @@ export const DELAI_PLANCHER_DORMANCE_JOURS = 60;
 export const RESULTATS_RELANCE_DORMANCE = ["reponse_obtenue", "sans_nouvelle"] as const;
 export type ResultatRelanceDormance = (typeof RESULTATS_RELANCE_DORMANCE)[number];
 
+/** Type de contact utilisable pour une escalade vers un rectorat, du plus
+ * préférable au dernier recours. Voir lib/rectoratContacts.ts. */
+export const TYPES_CONTACT_RECTORAT = [
+  "mediateur_academique",
+  "secretariat_general",
+  "standard_rectorat",
+] as const;
+export type TypeContactRectorat = (typeof TYPES_CONTACT_RECTORAT)[number];
+
+/** Provenance d'une fiche de contact rectorat : amorçage depuis le jeu de
+ * données MESRI (source d'amorçage uniquement, jamais de vérité continue —
+ * voir lib/rectoratContacts.ts) ou vérification manuelle par un opérateur
+ * Clairvoie. */
+export const SOURCES_CONTACT_RECTORAT = ["mesri_seed", "verification_manuelle"] as const;
+export type SourceContactRectorat = (typeof SOURCES_CONTACT_RECTORAT)[number];
+
+/** Statut de vérification d'une fiche de contact rectorat. "a_verifier" est
+ * l'état de toute entrée importée depuis le seed MESRI ; "obsolete_suspecte"
+ * est déclenché par un échec d'escalade réel, jamais corrigé
+ * automatiquement — seule une vérification manuelle peut y remédier. */
+export const STATUTS_VERIFICATION_RECTORAT = [
+  "a_verifier",
+  "verifie",
+  "obsolete_suspecte",
+] as const;
+export type StatutVerificationRectorat = (typeof STATUTS_VERIFICATION_RECTORAT)[number];
+
+/** Ancienneté (en mois) au-delà de laquelle une fiche de contact rectorat
+ * est signalée comme à re-vérifier dans le tableau de bord d'administration
+ * — n'affecte jamais la disponibilité du contact pour une escalade en
+ * cours, seulement sa visibilité côté admin. */
+export const RECTORAT_REVERIFICATION_MOIS = 6;
+
 /** Statuts possibles d'une suite judiciaire auto-déclarée par le parent. */
 export const STATUTS_SUITE_JUDICIAIRE = [
   "transmis",
