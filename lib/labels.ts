@@ -8,4 +8,5 @@ export const STATUT_TICKET_LABELS: Record<string, string> = {
   trianguléfondé: "Triangulé — fondé",
   trianguléinfondé: "Triangulé — infondé",
   clôturé_accord_mutuel: "Clôturé par accord mutuel",
+  sans_nouvelle: "Sans nouvelle du parent",
 };

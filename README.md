@@ -373,19 +373,56 @@ Vérifié par `tests/test_delai_fige_a_la_prise_de_position.test.ts`,
 `tests/test_non_conteste_sans_cloture_va_au_rectorat.test.ts` et
 `tests/test_etablissement_ne_peut_pas_clore_seul.test.ts`.
 
+## Relance déclenchée par l'établissement sur un ticket dormant
+
+Étend le mécanisme de relance déjà en place pour l'association tierce
+(section 4.4 du PRD) : un établissement peut signaler un ticket comme
+dormant lorsque le parent ne donne plus signe de vie, sans jamais obtenir
+le pouvoir de le faire disparaître de ses propres statistiques. Objectif :
+éviter l'accumulation de tickets ouverts sans jamais permettre à
+l'établissement d'éteindre seul une affaire.
+
+`lib/dormance.ts` -> `signalerDormance` (rôle ETABLISSEMENT exclusivement) :
+
+- refuse tout signalement précoce (ticket créé il y a moins de
+  `DELAI_PLANCHER_DORMANCE_JOURS`, 60 jours par défaut) et toute relance déjà
+  en attente pour ce ticket (pas de doublon de tâche) ;
+- **ne modifie jamais, par lui-même, le statut du ticket** — il crée
+  uniquement une entrée `SignalementDormance` et alimente la file de relance
+  de l'association tierce (`/association`, section « File de relance —
+  tickets dormants »), distincte de la file de triangulation existante.
+
+Seule `lib/dormance.ts` -> `traiterRelance` (rôle ASSOCIATION_TIERCE
+exclusivement) peut ensuite faire évoluer le statut :
+
+- `"reponse_obtenue"` : le ticket reprend son cours normal (même règle de
+  routage que `lib/positionEtablissement.ts` -> `enregistrerPosition`,
+  réutilisée via `statutNormalDuTicket`) ;
+- `"sans_nouvelle"` : statut dédié `"sans_nouvelle"` — jamais `"résolu"` ni
+  `"classé_sans_suite"`. Alimente les statistiques agrégées comme une
+  catégorie à part, cohérente avec le taux de complétude (section 4.4 du
+  PRD) plutôt que comme un statut de clôture déguisé.
+
+Vérifié par `tests/test_signalement_dormance_ne_modifie_pas_statut.test.ts`,
+`tests/test_delai_plancher_dormance.test.ts`,
+`tests/test_sans_nouvelle_jamais_resolu.test.ts` et
+`tests/test_seule_association_fait_evoluer_statut.test.ts`.
+
 ## Jeu de données de démonstration
 
 Le seed (`prisma/seed.ts`) génère :
 
 - 3 communes fictives de tailles différentes : **Sainte-Colombe** (3
   signalements — volontairement sous `K_ANONYMITY_THRESHOLD`, 8 par défaut),
-  **Vallonry** (4 signalements) et **Grandvillier** (9 signalements, répartis
+  **Vallonry** (4 signalements) et **Grandvillier** (11 signalements, répartis
   sur 2 établissements).
-- 16 signalements aux statuts variés : ouvert, en attente de vérification de
-  contact, répondu dans les délais, escaladé pour silence (dont un escaladé
-  automatiquement par le job de cron au moment du seed), triangulé (fondé /
-  infondé), clôturé par accord mutuel (encore révocable ou non), avec ou
-  sans suite judiciaire déclarée.
+- 18 signalements aux statuts variés : ouvert, en attente de vérification de
+  contact, prise de position (contestée ou non) dans les délais, escaladé
+  pour silence de l'établissement ou du parent (dont un de chaque escaladé
+  automatiquement par les jobs de cron au moment du seed), triangulé (fondé /
+  infondé), clôturé par accord mutuel (encore révocable ou non), signalé
+  dormant par l'établissement (relance en attente ou déjà traitée sans
+  nouvelle du parent), avec ou sans suite judiciaire déclarée.
 - 4 comptes de démonstration, un par rôle métier.
 - Des coordonnées de contact d'établissement (email, téléphone) pré-vérifiées
   pour la démo, et un établissement dont le seul canal connu a déjà échoué
@@ -395,7 +432,7 @@ Le seed (`prisma/seed.ts`) génère :
 Sur le tableau de bord public, vous pouvez observer la granularité dynamique
 en action : Sainte-Colombe et Vallonry (respectivement sous le seuil à
 l'échelle de la commune et de leur EPCI) remontent jusqu'au département,
-tandis que Grandvillier (9 cas, au-dessus du seuil) s'affiche directement à
+tandis que Grandvillier (11 cas, au-dessus du seuil) s'affiche directement à
 l'échelle de la commune.
 
 ## Principes non négociables — vérifiés par des tests

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { RESPONSE_DEADLINE_HOURS } from "@/config";
+import { RESPONSE_DEADLINE_HOURS, DELAI_PLANCHER_DORMANCE_JOURS } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
 import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
 import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
@@ -38,9 +38,17 @@ export default async function EtablissementPage({
   // pas le cas, il ne peut pas, de fait, en avoir connaissance.
   const tickets = await prisma.ticket.findMany({
     where: { etablissementId: identity.etablissementId, receptionConfirmeeAt: { not: null } },
-    include: { suitesJudiciaires: true },
+    include: { suitesJudiciaires: true, signalementsDormance: true },
     orderBy: { createdAt: "desc" },
   });
+
+  const STATUTS_CLOS = [
+    "clôturé_accord_mutuel",
+    "trianguléfondé",
+    "trianguléinfondé",
+    "sans_nouvelle",
+  ];
+  const seuilDormance = new Date(Date.now() - DELAI_PLANCHER_DORMANCE_JOURS * 24 * 60 * 60 * 1000);
 
   const personnesMiseEnCause = new Map(
     await Promise.all(
@@ -150,6 +158,44 @@ export default async function EtablissementPage({
                 )}
               </div>
             )}
+
+            {(() => {
+              const relanceEnAttente = ticket.signalementsDormance.find(
+                (s) => !s.relanceEffectuee
+              );
+              const eligible =
+                !STATUTS_CLOS.includes(ticket.statut) && ticket.createdAt <= seuilDormance;
+
+              if (relanceEnAttente) {
+                return (
+                  <p className="text-xs text-slate-400 border-t border-slate-100 pt-3">
+                    Signalé comme dormant le{" "}
+                    {relanceEnAttente.signaleLe.toLocaleDateString("fr-FR")} — relance en attente
+                    de traitement par l&apos;association tierce.
+                  </p>
+                );
+              }
+              if (eligible) {
+                return (
+                  <form
+                    action={`/api/signalement/${ticket.id}/dormance`}
+                    method="post"
+                    className="border-t border-slate-100 pt-3"
+                  >
+                    <p className="mb-2 text-xs text-slate-400">
+                      Le parent ne donne plus signe de vie depuis le dépôt de ce signalement
+                      (plus de {DELAI_PLANCHER_DORMANCE_JOURS} jours). Signaler ce ticket comme
+                      dormant crée une tâche de relance pour l&apos;association tierce — cela ne
+                      modifie jamais le statut du dossier par vous-même.
+                    </p>
+                    <button type="submit" className="btn btn-secondary text-xs">
+                      Signaler comme dormant
+                    </button>
+                  </form>
+                );
+              }
+              return null;
+            })()}
           </div>
         ))}
         {tickets.length === 0 && (

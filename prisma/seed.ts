@@ -3,6 +3,7 @@ import { hashPassword } from "../lib/password";
 import { appendAuditLog } from "../lib/hashchain";
 import { escaladerSiSilence, declarerPlainteDirecte } from "../lib/tickets";
 import { verifierClotureParent } from "../lib/positionEtablissement";
+import { signalerDormance, traiterRelance } from "../lib/dormance";
 import { enregistrerPersonneMiseEnCause } from "../lib/personneMiseEnCause";
 import { deriverAcademie } from "../lib/academies";
 import { calculerScores, periodeCourante } from "../lib/exemplarite";
@@ -31,6 +32,7 @@ async function main() {
   console.log("Nettoyage de la base…");
   await prisma.auditLog.deleteMany();
   await prisma.exemplariteScore.deleteMany();
+  await prisma.signalementDormance.deleteMany();
   await prisma.suiteJudiciaire.deleteMany();
   await prisma.tentativeContact.deleteMany();
   await prisma.personneMiseEnCause.deleteMany();
@@ -528,6 +530,66 @@ async function main() {
   });
   await log(t16.id, "verification_contact_requise", "system:cron");
 
+  // T17 — non contesté, parent silencieux : l'établissement signale ce
+  // ticket comme dormant (relance en attente de traitement par
+  // l'association tierce, jamais résolue par le seul établissement).
+  const t17 = await prisma.ticket.create({
+    data: {
+      parentPseudoId: "parent-fictif-6",
+      etablissementId: lyceeVictorHugo.id,
+      categorie: "Négligence de surveillance",
+      contenu: "Signalement non contesté par l'établissement, plus aucune nouvelle du parent.",
+      gravite: "legere",
+      statut: "attente_cloture_parent",
+      createdAt: daysAgo(75),
+      receptionConfirmeeAt: receptionRapide(daysAgo(75)),
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(74),
+      reponduAt: daysAgo(74),
+      reponseContenu: "Mesure de sensibilisation mise en place auprès du personnel encadrant.",
+    },
+  });
+  await log(t17.id, "creation", "parent-fictif-6");
+  await log(t17.id, "position_etablissement_non_conteste", "etab-demo-1");
+  await signalerDormance({
+    ticketId: t17.id,
+    acteurPseudo: "etab-demo-1",
+    role: "ETABLISSEMENT",
+  });
+
+  // T18 — même situation que T17, mais l'association tierce a déjà traité
+  // la relance sans obtenir de nouvelles du parent : statut dédié
+  // "sans_nouvelle", jamais un statut de clôture.
+  const t18 = await prisma.ticket.create({
+    data: {
+      parentPseudoId: "parent-fictif-7",
+      etablissementId: lyceeVictorHugo.id,
+      categorie: "Harcèlement entre élèves",
+      contenu: "Signalement non contesté par l'établissement, relance sans nouvelle du parent.",
+      gravite: "legere",
+      statut: "attente_cloture_parent",
+      createdAt: daysAgo(90),
+      receptionConfirmeeAt: receptionRapide(daysAgo(90)),
+      positionEtablissement: "non_conteste",
+      positionEtablissementDate: daysAgo(88),
+      reponduAt: daysAgo(88),
+      reponseContenu: "Médiation proposée entre les élèves concernés.",
+    },
+  });
+  await log(t18.id, "creation", "parent-fictif-7");
+  await log(t18.id, "position_etablissement_non_conteste", "etab-demo-1");
+  await signalerDormance({
+    ticketId: t18.id,
+    acteurPseudo: "etab-demo-1",
+    role: "ETABLISSEMENT",
+  });
+  await traiterRelance({
+    ticketId: t18.id,
+    acteurPseudo: "asso-demo-1",
+    role: "ASSOCIATION_TIERCE",
+    resultat: "sans_nouvelle",
+  });
+
   console.log("Exécution de l'escalade automatique (cron) pour les signalements en silence…");
   const escalades = await escaladerSiSilence();
   console.log(`  -> ${escalades.length} signalement(s) escaladé(s) automatiquement.`);
@@ -546,7 +608,7 @@ async function main() {
 
   console.log("\nSeed terminé.");
   console.log(
-    "Répartition géographique : Sainte-Colombe=3, Vallonry=4, Grandvillier=9 (total 16)."
+    "Répartition géographique : Sainte-Colombe=3, Vallonry=4, Grandvillier=11 (total 18)."
   );
 }
 

@@ -37,6 +37,9 @@ body {
 .badge-clôturé_accord_mutuel {
   @apply bg-slate-800 text-white;
 }
+.badge-sans_nouvelle {
+  @apply bg-slate-300 text-slate-600;
+}
 
 .card {
   @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm;

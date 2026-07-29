@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { VERDICTS, TYPES_CONTACT } from "@/config";
+import { VERDICTS, TYPES_CONTACT, RESULTATS_RELANCE_DORMANCE } from "@/config";
 import { STATUT_TICKET_LABELS } from "@/lib/labels";
 import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
 import { recupererContactParent } from "@/lib/parentAuth";
@@ -67,6 +67,19 @@ export default async function AssociationPage({
       })
     )
   );
+
+  // File de relance — tickets dormants signalés par un établissement,
+  // distincte de la file de triangulation ci-dessus : un signalement de
+  // dormance ne modifie jamais le statut par lui-même, seule cette relance,
+  // une fois traitée ici, le peut (lib/dormance.ts -> traiterRelance).
+  const aRelancer = await prisma.ticket.findMany({
+    where: { signalementsDormance: { some: { relanceEffectuee: false } } },
+    include: {
+      etablissement: { include: { commune: true } },
+      signalementsDormance: { where: { relanceEffectuee: false }, orderBy: { signaleLe: "desc" } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
 
   const dejaTraites = await prisma.ticket.findMany({
     where: { statut: { in: ["trianguléfondé", "trianguléinfondé"] } },
@@ -258,6 +271,63 @@ export default async function AssociationPage({
         ))}
         {aTrianguler.length === 0 && (
           <p className="text-slate-500">Aucun signalement en attente de triangulation.</p>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold text-clairvoie-bleu">
+          File de relance — tickets dormants
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Signalés par un établissement lorsque le parent ne donne plus signe
+          de vie. Contactez le parent ; le statut du ticket n&apos;évolue que
+          lorsque vous traitez la relance ci-dessous.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {aRelancer.map((ticket) => (
+          <div key={ticket.id} className="card space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-slate-800">{ticket.categorie}</p>
+                <p className="text-xs text-slate-500">
+                  {ticket.etablissement.nom} · {ticket.etablissement.commune.nom} · déposé le{" "}
+                  {ticket.createdAt.toLocaleDateString("fr-FR")}
+                </p>
+              </div>
+              <span className={`badge badge-${ticket.statut}`}>
+                {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
+              </span>
+            </div>
+            <p className="text-sm text-slate-600">{ticket.contenu}</p>
+            <p className="text-xs text-amber-700">
+              Signalé comme dormant le{" "}
+              {ticket.signalementsDormance[0]?.signaleLe.toLocaleDateString("fr-FR")}.
+            </p>
+            <form
+              action={`/api/signalement/${ticket.id}/relance`}
+              method="post"
+              className="flex items-center gap-2 border-t border-slate-100 pt-3"
+            >
+              <select name="resultat" className="input w-auto text-xs" required defaultValue="">
+                <option value="" disabled>
+                  Résultat de la relance…
+                </option>
+                {RESULTATS_RELANCE_DORMANCE.map((r) => (
+                  <option key={r} value={r}>
+                    {r.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="btn btn-primary text-xs">
+                Valider
+              </button>
+            </form>
+          </div>
+        ))}
+        {aRelancer.length === 0 && (
+          <p className="text-slate-500">Aucune relance en attente de traitement.</p>
         )}
       </div>
 

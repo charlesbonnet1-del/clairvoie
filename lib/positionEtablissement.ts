@@ -76,6 +76,24 @@ export async function enregistrerPosition(params: {
 }
 
 /**
+ * Statut "normal" d'un ticket compte tenu de la position (ou absence de
+ * position) déjà connue de l'établissement — même règle de routage que
+ * dans enregistrerPosition ci-dessus. Exportée pour être réutilisée par
+ * lib/dormance.ts -> traiterRelance, quand un ticket dormant reprend son
+ * cours normal après qu'une relance a obtenu une réponse du parent.
+ */
+export function statutNormalDuTicket(ticket: {
+  positionEtablissement: string | null;
+  gravite: string;
+}): string {
+  if (!ticket.positionEtablissement) return "ouvert";
+  if (ticket.positionEtablissement === "conteste" || ticket.gravite === "grave") {
+    return "triangulation_requise";
+  }
+  return "attente_cloture_parent";
+}
+
+/**
  * Job périodique (même mécanisme que lib/tickets.ts -> escaladerSiSilence,
  * appliqué ici au silence du PARENT plutôt qu'à celui de l'établissement) :
  * si un ticket non contesté (statut "attente_cloture_parent") n'a pas été

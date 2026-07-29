@@ -212,6 +212,7 @@ model Ticket {
   suitesJudiciaires SuiteJudiciaire[]
   tentativesContact TentativeContact[]
   personnesMiseEnCause PersonneMiseEnCause[]
+  signalementsDormance SignalementDormance[]
 }
 
 // ---------------------------------------------------------------------------
@@ -318,4 +319,26 @@ model ExemplariteScore {
 
   @@index([entiteType, entiteId])
   @@index([entiteType, periodeDebut, periodeFin])
+}
+
+// ---------------------------------------------------------------------------
+// Relance sur ticket dormant, déclenchée par l'établissement — étend le
+// mécanisme de relance de l'association tierce déjà en place (section 4.4
+// du PRD). Objectif : éviter l'accumulation de tickets ouverts dont le
+// parent n'a plus donné signe de vie, sans jamais donner à l'établissement
+// le pouvoir de les faire disparaître de ses propres statistiques. Le seul
+// effet direct d'un signalement est de créer cette entrée et d'alimenter la
+// file de relance de l'association tierce (lib/dormance.ts ->
+// signalerDormance) : il ne modifie jamais, par lui-même, le statut du
+// ticket. Seule lib/dormance.ts -> traiterRelance (rôle ASSOCIATION_TIERCE
+// exclusivement) peut faire évoluer ce statut, une fois la relance traitée.
+// ---------------------------------------------------------------------------
+model SignalementDormance {
+  id               String    @id @default(cuid())
+  ticketId         String
+  ticket           Ticket    @relation(fields: [ticketId], references: [id])
+  signalePar       String // pseudoId du compte établissement à l'origine du signalement
+  signaleLe        DateTime  @default(now())
+  relanceEffectuee Boolean   @default(false)
+  resultatRelance  String? // "reponse_obtenue" | "sans_nouvelle" | null tant que non traité
 }

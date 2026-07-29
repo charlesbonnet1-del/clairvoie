@@ -136,7 +136,10 @@ export function deriverGraviteDepuisCategorie(categorie: string): Gravite {
  * de "escaladé_rectorat" (l'établissement a pris position "non_conteste"
  * dans les temps, mais le parent n'a pas clôturé après
  * DELAI_CLOTURE_PARENT_JOURS — lib/positionEtablissement.ts ->
- * verifierClotureParent) : ce n'est jamais imputable à l'établissement. */
+ * verifierClotureParent) : ce n'est jamais imputable à l'établissement.
+ * "sans_nouvelle" (lib/dormance.ts -> traiterRelance) est distinct de tout
+ * statut de clôture : il documente l'absence de nouvelles du parent après
+ * relance, jamais un dossier "résolu" ou "classé sans suite". */
 export const STATUTS_TICKET = [
   "ouvert",
   "verification_contact_requise",
@@ -147,6 +150,7 @@ export const STATUTS_TICKET = [
   "trianguléfondé",
   "trianguléinfondé",
   "clôturé_accord_mutuel",
+  "sans_nouvelle",
 ] as const;
 export type StatutTicket = (typeof STATUTS_TICKET)[number];
 
@@ -166,6 +170,16 @@ export type PositionEtablissement = (typeof POSITIONS_ETABLISSEMENT)[number];
  * RESPONSE_DEADLINE_HOURS / escaladerSiSilence, appliqué ici au silence du
  * parent plutôt qu'à celui de l'établissement. */
 export const DELAI_CLOTURE_PARENT_JOURS = 30;
+
+/** Nombre de jours minimum depuis le dépôt d'un ticket avant qu'un
+ * établissement puisse le signaler comme dormant (lib/dormance.ts ->
+ * signalerDormance) — pas de signalement précoce. */
+export const DELAI_PLANCHER_DORMANCE_JOURS = 60;
+
+/** Résultat possible du traitement, par l'association tierce, d'une relance
+ * sur ticket dormant. Voir lib/dormance.ts -> traiterRelance. */
+export const RESULTATS_RELANCE_DORMANCE = ["reponse_obtenue", "sans_nouvelle"] as const;
+export type ResultatRelanceDormance = (typeof RESULTATS_RELANCE_DORMANCE)[number];
 
 /** Statuts possibles d'une suite judiciaire auto-déclarée par le parent. */
 export const STATUTS_SUITE_JUDICIAIRE = [
