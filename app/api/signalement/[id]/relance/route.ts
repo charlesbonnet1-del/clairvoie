@@ -15,7 +15,7 @@ export async function POST(
 
     if (!RESULTATS_RELANCE_DORMANCE.includes(resultat as (typeof RESULTATS_RELANCE_DORMANCE)[number])) {
       return NextResponse.redirect(
-        new URL("/association?error=resultat_relance_invalide", req.url),
+        new URL(`/association/${params.id}?error=resultat_relance_invalide`, req.url),
         { status: 303 }
       );
     }
@@ -27,16 +27,17 @@ export async function POST(
       resultat: resultat as (typeof RESULTATS_RELANCE_DORMANCE)[number],
     });
 
-    return NextResponse.redirect(new URL("/association?success=relance_traitee", req.url), {
-      status: 303,
-    });
+    return NextResponse.redirect(
+      new URL(`/association/${params.id}?success=relance_traitee`, req.url),
+      { status: 303 }
+    );
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
     }
     if (err instanceof RegleMetierError) {
       return NextResponse.redirect(
-        new URL(`/association?error=${encodeURIComponent(err.message)}`, req.url),
+        new URL(`/association/${params.id}?error=${encodeURIComponent(err.message)}`, req.url),
         { status: 303 }
       );
     }

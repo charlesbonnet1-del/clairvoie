@@ -14,7 +14,7 @@ export async function POST(
 
     if (!STATUTS_SUITE_JUDICIAIRE.includes(statut as (typeof STATUTS_SUITE_JUDICIAIRE)[number])) {
       return NextResponse.redirect(
-        new URL("/parent?error=statut_judiciaire_invalide", req.url),
+        new URL(`/parent/${params.id}?error=statut_judiciaire_invalide`, req.url),
         { status: 303 }
       );
     }
@@ -36,7 +36,7 @@ export async function POST(
     });
 
     return NextResponse.redirect(
-      new URL("/parent?success=suite_judiciaire_declaree", req.url),
+      new URL(`/parent/${params.id}?success=suite_judiciaire_declaree`, req.url),
       { status: 303 }
     );
   } catch (err) {
@@ -45,7 +45,7 @@ export async function POST(
     }
     if (err instanceof RegleMetierError) {
       return NextResponse.redirect(
-        new URL(`/parent?error=${encodeURIComponent(err.message)}`, req.url),
+        new URL(`/parent/${params.id}?error=${encodeURIComponent(err.message)}`, req.url),
         { status: 303 }
       );
     }

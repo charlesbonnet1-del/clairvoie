@@ -16,7 +16,7 @@ export async function POST(
 
     if (!POSITIONS_ETABLISSEMENT.includes(position as (typeof POSITIONS_ETABLISSEMENT)[number])) {
       return NextResponse.redirect(
-        new URL("/etablissement?error=position_invalide", req.url),
+        new URL(`/etablissement/${params.id}?error=position_invalide`, req.url),
         { status: 303 }
       );
     }
@@ -29,16 +29,17 @@ export async function POST(
       commentaire,
     });
 
-    return NextResponse.redirect(new URL("/etablissement?success=position_enregistree", req.url), {
-      status: 303,
-    });
+    return NextResponse.redirect(
+      new URL(`/etablissement/${params.id}?success=position_enregistree`, req.url),
+      { status: 303 }
+    );
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
     }
     if (err instanceof RegleMetierError) {
       return NextResponse.redirect(
-        new URL(`/etablissement?error=${encodeURIComponent(err.message)}`, req.url),
+        new URL(`/etablissement/${params.id}?error=${encodeURIComponent(err.message)}`, req.url),
         { status: 303 }
       );
     }

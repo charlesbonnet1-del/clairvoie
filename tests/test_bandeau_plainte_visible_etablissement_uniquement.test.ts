@@ -23,18 +23,18 @@ function walk(dir: string): string[] {
 }
 
 describe("Bandeau 'plainte déposée directement' — visible uniquement côté établissement", () => {
-  it("le texte du bandeau n'apparaît que dans app/etablissement/page.tsx", () => {
+  it("le texte du bandeau n'apparaît que dans les vues établissement (jamais parent/association/rectorat/public)", () => {
     const files = walk(path.join(SCAN_ROOT, "app"));
     const matches = files.filter((f) => readFileSync(f, "utf-8").includes(BANNER_TEXT));
 
     expect(matches.map((f) => path.relative(SCAN_ROOT, f))).toEqual([
-      path.join("app", "etablissement", "page.tsx"),
+      path.join("app", "etablissement", "[id]", "page.tsx"),
     ]);
   });
 
   it("la vue établissement n'affiche jamais le document justificatif de la plainte (documentRef)", () => {
     const source = readFileSync(
-      path.join(SCAN_ROOT, "app", "etablissement", "page.tsx"),
+      path.join(SCAN_ROOT, "app", "etablissement", "[id]", "page.tsx"),
       "utf-8"
     );
     expect(source).not.toContain("documentRef");

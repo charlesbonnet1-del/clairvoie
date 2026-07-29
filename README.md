@@ -87,6 +87,24 @@ L'écran `/login` simule un choix de fournisseur d'identité
 (« FranceConnect (démo) », « EduConnect (démo) ») : il ne s'agit que d'une
 mise en scène visuelle, sans aucun appel réel à un fournisseur d'identité.
 
+## Tableaux de bord façon boîte mail
+
+Les quatre vues métier (`/parent`, `/etablissement`, `/association`,
+`/rectorat`) suivent toutes le même principe qu'une boîte mail : une liste
+compacte (catégorie du signalement, date, statut — `components/InboxRow.tsx`)
+plutôt qu'une pile de cartes détaillées, et un clic sur une ligne ouvre une
+page dédiée (`/<role>/[id]`) avec le détail complet du signalement et les
+actions possibles pour ce rôle. Le tableau de bord public (`/dashboard`)
+n'est volontairement pas concerné : il ne présente que des agrégats, jamais
+un signalement individuel (principe 6).
+
+Côté association tierce, chaque file (vérification de contact, triangulation,
+relance sur ticket dormant, verdicts récents) reste une liste distincte sur
+`/association`, mais toutes pointent vers la même page de détail
+`/association/[id]` : celle-ci n'affiche que les actions pertinentes pour
+l'état courant du ticket (formulaire de contact, de triangulation, ou de
+relance), sans dupliquer la logique d'affichage.
+
 ## Inscription parent et vérification obligatoire
 
 Un nouveau parent peut créer un compte sur `/inscription` (email, téléphone,
@@ -107,6 +125,16 @@ pré-vérifié dans le seed.
 Le formulaire `/parent/nouveau-signalement` ne fait plus choisir
 l'établissement dans une liste figée : le parent tape le nom de sa commune,
 et l'établissement se pré-remplit à partir de données publiques réelles.
+
+Le formulaire se présente en 7 étapes (une information à la fois : commune,
+établissement, date des faits, personne(s) mise(s) en cause, plainte
+directe, catégorie, description), avec un bouton « Suivant » désactivé tant
+que l'étape courante n'est pas valide plutôt qu'une longue page à remplir
+d'un coup. Il s'agit uniquement d'une présentation par étapes côté
+navigateur (`components/SignalementForm.tsx`) : tous les champs restent
+montés dans le DOM (masqués via `hidden` plutôt que démontés) pour ne
+perdre aucune saisie en navigant entre les étapes, et une seule requête
+`POST /api/signalement` est envoyée à la fin, comme avant.
 
 - **Communes** — [geo.api.gouv.fr](https://geo.api.gouv.fr) (API officielle,
   gratuite, sans clé) : recherche par nom, renvoie code INSEE, EPCI et

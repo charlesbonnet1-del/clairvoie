@@ -71,18 +71,24 @@ describe("L'établissement ne peut jamais clore seul un ticket", () => {
     expect(violations).toEqual([]);
   });
 
-  it("la seule route accessible au rôle ETABLISSEMENT est la prise de position, et n'appelle qu'enregistrerPosition", () => {
+  it("les seules routes accessibles au rôle ETABLISSEMENT sont la prise de position et le signalement de dormance, jamais une clôture", () => {
     const routeFiles = walk(path.join(SCAN_ROOT, "app", "api"));
     const routesEtablissement = routeFiles.filter((file) =>
       /requireRole\(\s*"ETABLISSEMENT"\s*\)/.test(readFileSync(file, "utf-8"))
     );
 
-    expect(routesEtablissement.map((f) => path.relative(SCAN_ROOT, f))).toEqual([
-      path.join("app", "api", "signalement", "[id]", "position", "route.ts"),
-    ]);
+    expect(routesEtablissement.map((f) => path.relative(SCAN_ROOT, f)).sort()).toEqual(
+      [
+        path.join("app", "api", "signalement", "[id]", "position", "route.ts"),
+        path.join("app", "api", "signalement", "[id]", "dormance", "route.ts"),
+      ].sort()
+    );
 
-    const source = readFileSync(routesEtablissement[0], "utf-8");
-    expect(source).toContain("enregistrerPosition");
+    for (const file of routesEtablissement) {
+      const source = readFileSync(file, "utf-8");
+      expect(source).toMatch(/enregistrerPosition|signalerDormance/);
+      expect(source).not.toContain("traiterRelance");
+    }
   });
 
   it("enregistrerPosition ne fait jamais passer un ticket à un statut de clôture, quelle que soit la position ou la gravité", async () => {

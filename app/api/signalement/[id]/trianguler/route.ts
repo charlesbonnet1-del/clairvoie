@@ -14,7 +14,7 @@ export async function POST(
 
     if (!VERDICTS.includes(verdict as (typeof VERDICTS)[number])) {
       return NextResponse.redirect(
-        new URL("/association?error=verdict_invalide", req.url),
+        new URL(`/association/${params.id}?error=verdict_invalide`, req.url),
         { status: 303 }
       );
     }
@@ -25,16 +25,17 @@ export async function POST(
       verdict: verdict as "fondé" | "à_investiguer" | "infondé",
     });
 
-    return NextResponse.redirect(new URL("/association?success=verdict_rendu", req.url), {
-      status: 303,
-    });
+    return NextResponse.redirect(
+      new URL(`/association/${params.id}?success=verdict_rendu`, req.url),
+      { status: 303 }
+    );
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
     }
     if (err instanceof RegleMetierError) {
       return NextResponse.redirect(
-        new URL(`/association?error=${encodeURIComponent(err.message)}`, req.url),
+        new URL(`/association/${params.id}?error=${encodeURIComponent(err.message)}`, req.url),
         { status: 303 }
       );
     }

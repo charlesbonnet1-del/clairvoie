@@ -1,26 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { RESPONSE_DEADLINE_HOURS, DELAI_PLANCHER_DORMANCE_JOURS } from "@/config";
-import { STATUT_TICKET_LABELS } from "@/lib/labels";
-import { recupererPersonnesMiseEnCause } from "@/lib/personneMiseEnCause";
-import PersonneMiseEnCauseCard from "@/components/PersonneMiseEnCauseCard";
-import DateFaitsLigne from "@/components/DateFaitsLigne";
+import InboxRow from "@/components/InboxRow";
 
-function delaiRestant(receptionConfirmeeAt: Date): string {
-  const deadline = new Date(
-    receptionConfirmeeAt.getTime() + RESPONSE_DEADLINE_HOURS * 60 * 60 * 1000
-  );
-  const heuresRestantes = Math.round((deadline.getTime() - Date.now()) / (1000 * 60 * 60));
-  if (heuresRestantes <= 0) return "Délai dépassé";
-  return `${heuresRestantes} h avant escalade automatique`;
-}
-
-export default async function EtablissementPage({
-  searchParams,
-}: {
-  searchParams: { success?: string; error?: string };
-}) {
+export default async function EtablissementPage() {
   const identity = await getSession();
   if (!identity || identity.role !== "ETABLISSEMENT") {
     redirect("/login");
@@ -38,168 +21,26 @@ export default async function EtablissementPage({
   // pas le cas, il ne peut pas, de fait, en avoir connaissance.
   const tickets = await prisma.ticket.findMany({
     where: { etablissementId: identity.etablissementId, receptionConfirmeeAt: { not: null } },
-    include: { suitesJudiciaires: true, signalementsDormance: true },
     orderBy: { createdAt: "desc" },
   });
-
-  const STATUTS_CLOS = [
-    "clôturé_accord_mutuel",
-    "trianguléfondé",
-    "trianguléinfondé",
-    "sans_nouvelle",
-  ];
-  const seuilDormance = new Date(Date.now() - DELAI_PLANCHER_DORMANCE_JOURS * 24 * 60 * 60 * 1000);
-
-  const personnesMiseEnCause = new Map(
-    await Promise.all(
-      tickets.map(async (ticket) => {
-        const personnes = await recupererPersonnesMiseEnCause({ ticketId: ticket.id, identity });
-        return [ticket.id, personnes] as const;
-      })
-    )
-  );
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-clairvoie-bleu">Signalements reçus</h1>
 
-      {searchParams.success && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          Réponse envoyée avec succès.
-        </p>
-      )}
-      {searchParams.error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {decodeURIComponent(searchParams.error)}
-        </p>
-      )}
-
-      <div className="space-y-4">
+      <div className="card divide-y divide-slate-100 p-0">
         {tickets.map((ticket) => (
-          <div key={ticket.id} className="card space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-slate-800">{ticket.categorie}</p>
-                <p className="text-xs text-slate-500">
-                  Reçu le {ticket.createdAt.toLocaleDateString("fr-FR")} · gravité :{" "}
-                  {ticket.gravite}
-                </p>
-              </div>
-              <span className={`badge badge-${ticket.statut}`}>
-                {STATUT_TICKET_LABELS[ticket.statut] ?? ticket.statut}
-              </span>
-            </div>
-            <p className="text-sm text-slate-600">{ticket.contenu}</p>
-            <DateFaitsLigne ticket={ticket} />
-
-            {/* Fait strictement informatif : jamais le document justificatif
-                (récépissé de dépôt de plainte) ni aucun autre détail de la
-                SuiteJudiciaire ne sont exposés ici, uniquement ce booléen
-                d'origine. */}
-            {ticket.suitesJudiciaires.some(
-              (s) => s.origine === "plainte_directe_parent" || s.origine === "les_deux"
-            ) && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Une plainte a été déposée directement par la famille — le
-                signalement peut faire l&apos;objet d&apos;une enquête judiciaire
-                en parallèle.
-              </p>
-            )}
-
-            <PersonneMiseEnCauseCard personnes={personnesMiseEnCause.get(ticket.id) ?? []} />
-
-            {ticket.statut === "ouvert" && ticket.receptionConfirmeeAt && !ticket.positionEtablissement && (
-              <>
-                <p className="text-xs font-medium text-amber-700">
-                  {delaiRestant(ticket.receptionConfirmeeAt)}
-                </p>
-                <form
-                  action={`/api/signalement/${ticket.id}/position`}
-                  method="post"
-                  className="space-y-2 border-t border-slate-100 pt-3"
-                >
-                  <p className="label">Prise de position</p>
-                  <div className="flex gap-4 text-sm text-slate-700">
-                    <label className="flex items-center gap-2">
-                      <input type="radio" name="position" value="non_conteste" required />
-                      Je ne conteste pas ce signalement
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="radio" name="position" value="conteste" required />
-                      Je conteste ce signalement
-                    </label>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    {ticket.gravite === "grave"
-                      ? "Signalement classé grave : quelle que soit votre position, il sera transmis à l'association tierce pour triangulation."
-                      : "Ne pas contester ne clôture pas le dossier seul : le parent doit encore confirmer la clôture, sans quoi le signalement est transmis au rectorat."}
-                  </p>
-                  <textarea
-                    className="input"
-                    name="commentaire"
-                    rows={3}
-                    placeholder="Commentaire (optionnel) : justification, mesure prise…"
-                  />
-                  <button type="submit" className="btn btn-primary text-xs">
-                    Enregistrer ma position
-                  </button>
-                </form>
-              </>
-            )}
-
-            {ticket.positionEtablissement && (
-              <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                <p className="font-medium text-slate-700">
-                  Votre position :{" "}
-                  {ticket.positionEtablissement === "conteste" ? "contesté" : "non contesté"}
-                </p>
-                {ticket.reponseContenu && (
-                  <p className="mt-1 text-slate-600">{ticket.reponseContenu}</p>
-                )}
-              </div>
-            )}
-
-            {(() => {
-              const relanceEnAttente = ticket.signalementsDormance.find(
-                (s) => !s.relanceEffectuee
-              );
-              const eligible =
-                !STATUTS_CLOS.includes(ticket.statut) && ticket.createdAt <= seuilDormance;
-
-              if (relanceEnAttente) {
-                return (
-                  <p className="text-xs text-slate-400 border-t border-slate-100 pt-3">
-                    Signalé comme dormant le{" "}
-                    {relanceEnAttente.signaleLe.toLocaleDateString("fr-FR")} — relance en attente
-                    de traitement par l&apos;association tierce.
-                  </p>
-                );
-              }
-              if (eligible) {
-                return (
-                  <form
-                    action={`/api/signalement/${ticket.id}/dormance`}
-                    method="post"
-                    className="border-t border-slate-100 pt-3"
-                  >
-                    <p className="mb-2 text-xs text-slate-400">
-                      Le parent ne donne plus signe de vie depuis le dépôt de ce signalement
-                      (plus de {DELAI_PLANCHER_DORMANCE_JOURS} jours). Signaler ce ticket comme
-                      dormant crée une tâche de relance pour l&apos;association tierce — cela ne
-                      modifie jamais le statut du dossier par vous-même.
-                    </p>
-                    <button type="submit" className="btn btn-secondary text-xs">
-                      Signaler comme dormant
-                    </button>
-                  </form>
-                );
-              }
-              return null;
-            })()}
-          </div>
+          <InboxRow
+            key={ticket.id}
+            href={`/etablissement/${ticket.id}`}
+            categorie={ticket.categorie}
+            date={ticket.createdAt}
+            souscription={`Gravité : ${ticket.gravite}`}
+            statut={ticket.statut}
+          />
         ))}
         {tickets.length === 0 && (
-          <p className="text-slate-500">Aucun signalement reçu pour le moment.</p>
+          <p className="p-4 text-slate-500">Aucun signalement reçu pour le moment.</p>
         )}
       </div>
     </div>

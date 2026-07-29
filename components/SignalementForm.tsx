@@ -36,6 +36,16 @@ interface PersonneMiseEnCauseSaisie {
   recurrent: boolean;
 }
 
+const ETAPES = [
+  "Commune",
+  "Établissement",
+  "Date des faits",
+  "Personne mise en cause",
+  "Plainte directe",
+  "Catégorie",
+  "Description",
+] as const;
+
 let prochainId = 0;
 function nouveauContactSecondaire(): ContactSecondaire {
   prochainId += 1;
@@ -67,6 +77,11 @@ export default function SignalementForm() {
 
   const [plainteDeposee, setPlainteDeposee] = useState(false);
   const [recepisseFile, setRecepisseFile] = useState<File | null>(null);
+
+  const [categorie, setCategorie] = useState("");
+  const [contenu, setContenu] = useState("");
+
+  const [step, setStep] = useState(0);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -177,11 +192,17 @@ export default function SignalementForm() {
       ? etablissements.find((e) => e.uai === etablissementChoice) ?? null
       : null;
 
-  const formValide =
-    Boolean(selectedCommune) &&
+  const etapeValide: boolean[] = [
+    Boolean(selectedCommune),
     Boolean(etablissementChoice) &&
-    (etablissementChoice !== AUTRE_ETABLISSEMENT || etablissementManuelNom.trim().length > 0) &&
-    (!plainteDeposee || recepisseFile !== null);
+      (etablissementChoice !== AUTRE_ETABLISSEMENT || etablissementManuelNom.trim().length > 0),
+    true,
+    true,
+    !plainteDeposee || recepisseFile !== null,
+    Boolean(categorie),
+    contenu.trim().length > 0,
+  ];
+  const formValide = etapeValide.every(Boolean);
 
   const contactsSecondairesJson = JSON.stringify(
     contactsSecondaires
@@ -228,8 +249,23 @@ export default function SignalementForm() {
       <input type="hidden" name="contactsSecondairesJson" value={contactsSecondairesJson} />
       <input type="hidden" name="personnesMiseEnCauseJson" value={personnesMiseEnCauseJson} />
 
+      <div>
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Étape {step + 1} / {ETAPES.length} — {ETAPES[step]}
+          </span>
+          <span>{Math.round(((step + 1) / ETAPES.length) * 100)} %</span>
+        </div>
+        <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+          <div
+            className="h-1.5 rounded-full bg-clairvoie-bleuclair transition-all"
+            style={{ width: `${((step + 1) / ETAPES.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
       {/* 1. Commune */}
-      <div className="relative">
+      <div className={step === 0 ? "relative" : "relative hidden"}>
         <label className="label" htmlFor="commune">
           Commune
         </label>
@@ -266,6 +302,7 @@ export default function SignalementForm() {
       </div>
 
       {/* 2. Établissement (+ coordonnées officielles + contacts secondaires) */}
+      <div className={step === 1 ? "space-y-4" : "hidden"}>
       {selectedCommune && (
         <div>
           <label className="label" htmlFor="etablissementChoice">
@@ -414,9 +451,10 @@ export default function SignalementForm() {
           ))}
         </div>
       )}
+      </div>
 
       {/* 3. Date des faits */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className={step === 2 ? "grid grid-cols-2 gap-2" : "hidden"}>
         <div>
           <label className="label" htmlFor="dateFaits">
             Date des faits
@@ -437,7 +475,13 @@ export default function SignalementForm() {
       </div>
 
       {/* 4. Personne(s) mise(s) en cause */}
-      <div className="rounded-lg border border-dashed border-slate-300 p-3 space-y-3">
+      <div
+        className={
+          step === 3
+            ? "rounded-lg border border-dashed border-slate-300 p-3 space-y-3"
+            : "hidden"
+        }
+      >
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium text-slate-600">
             Personne(s) mise(s) en cause (optionnel)
@@ -496,7 +540,13 @@ export default function SignalementForm() {
       </div>
 
       {/* Plainte déposée directement (optionnel) */}
-      <div className="rounded-lg border border-dashed border-slate-300 p-3 space-y-3">
+      <div
+        className={
+          step === 4
+            ? "rounded-lg border border-dashed border-slate-300 p-3 space-y-3"
+            : "hidden"
+        }
+      >
         <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
           <input
             type="checkbox"
@@ -533,11 +583,18 @@ export default function SignalementForm() {
       </div>
 
       {/* 5. Catégorie */}
-      <div>
+      <div className={step === 5 ? "" : "hidden"}>
         <label className="label" htmlFor="categorie">
           Catégorie
         </label>
-        <select className="input" id="categorie" name="categorie" required defaultValue="">
+        <select
+          className="input"
+          id="categorie"
+          name="categorie"
+          required
+          value={categorie}
+          onChange={(e) => setCategorie(e.target.value)}
+        >
           <option value="">Sélectionner une catégorie…</option>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -548,7 +605,7 @@ export default function SignalementForm() {
       </div>
 
       {/* 6. Description */}
-      <div>
+      <div className={step === 6 ? "" : "hidden"}>
         <label className="label" htmlFor="contenu">
           Description des faits
         </label>
@@ -558,13 +615,39 @@ export default function SignalementForm() {
           name="contenu"
           rows={6}
           required
+          value={contenu}
+          onChange={(e) => setContenu(e.target.value)}
           placeholder="Décrivez les faits observés, avec autant de précision que possible…"
         />
       </div>
 
-      <button type="submit" className="btn btn-primary w-full" disabled={!formValide}>
-        Déposer le signalement
-      </button>
+      <div className="flex items-center justify-between pt-2">
+        {step > 0 ? (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setStep((s) => Math.max(0, s - 1))}
+          >
+            Précédent
+          </button>
+        ) : (
+          <span />
+        )}
+        {step < ETAPES.length - 1 ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!etapeValide[step]}
+            onClick={() => setStep((s) => Math.min(ETAPES.length - 1, s + 1))}
+          >
+            Suivant
+          </button>
+        ) : (
+          <button type="submit" className="btn btn-primary" disabled={!formValide}>
+            Déposer le signalement
+          </button>
+        )}
+      </div>
     </form>
   );
 }

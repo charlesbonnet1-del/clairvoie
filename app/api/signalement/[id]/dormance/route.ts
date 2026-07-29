@@ -16,16 +16,17 @@ export async function POST(
       role: identity.role,
     });
 
-    return NextResponse.redirect(new URL("/etablissement?success=dormance_signalee", req.url), {
-      status: 303,
-    });
+    return NextResponse.redirect(
+      new URL(`/etablissement/${params.id}?success=dormance_signalee`, req.url),
+      { status: 303 }
+    );
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
     }
     if (err instanceof RegleMetierError) {
       return NextResponse.redirect(
-        new URL(`/etablissement?error=${encodeURIComponent(err.message)}`, req.url),
+        new URL(`/etablissement/${params.id}?error=${encodeURIComponent(err.message)}`, req.url),
         { status: 303 }
       );
     }

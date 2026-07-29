@@ -17,14 +17,16 @@ export async function POST(
       await cloturerParAccordMutuel({ ticketId: params.id, acteurPseudo: identity.pseudoId });
     }
 
-    return NextResponse.redirect(new URL("/parent?success=cloture", req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/parent/${params.id}?success=cloture`, req.url), {
+      status: 303,
+    });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
     }
     if (err instanceof RegleMetierError) {
       return NextResponse.redirect(
-        new URL(`/parent?error=${encodeURIComponent(err.message)}`, req.url),
+        new URL(`/parent/${params.id}?error=${encodeURIComponent(err.message)}`, req.url),
         { status: 303 }
       );
     }

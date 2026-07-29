@@ -22,7 +22,7 @@ export async function POST(
     if (!documentRef) {
       return NextResponse.redirect(
         new URL(
-          `/parent?error=${encodeURIComponent(
+          `/parent/${params.id}?error=${encodeURIComponent(
             "Le récépissé de dépôt de plainte est obligatoire pour enregistrer une plainte directe."
           )}`,
           req.url
@@ -38,7 +38,7 @@ export async function POST(
     });
 
     return NextResponse.redirect(
-      new URL("/parent?success=plainte_directe_declaree", req.url),
+      new URL(`/parent/${params.id}?success=plainte_directe_declaree`, req.url),
       { status: 303 }
     );
   } catch (err) {
@@ -47,7 +47,7 @@ export async function POST(
     }
     if (err instanceof RegleMetierError) {
       return NextResponse.redirect(
-        new URL(`/parent?error=${encodeURIComponent(err.message)}`, req.url),
+        new URL(`/parent/${params.id}?error=${encodeURIComponent(err.message)}`, req.url),
         { status: 303 }
       );
     }
